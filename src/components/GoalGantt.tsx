@@ -571,7 +571,7 @@ export default function GoalGantt() {
                         <span
                           className={`truncate cursor-pointer hover:text-amber-700 ${node.issue_type === 'epic' ? 'font-bold' : ''} ${node.status === 'done' ? 'line-through text-stone-400' : ''}`}
                           title={node.title}
-                          onClick={() => startTitleEdit(node)}>
+                          onClick={() => openEdit(node)}>
                           {node.title}
                         </span>
                       )}

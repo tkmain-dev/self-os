@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiPost, apiPut, apiDelete } from '../hooks/useApi'
+import Diary from './Diary'
 
 // ── Types ──
 interface ScheduleItem {
@@ -115,7 +116,7 @@ export default function DailyPage() {
 
         {/* Right: Diary + Habits */}
         <div className="flex-1 min-w-0 space-y-6">
-          <DiarySection date={date} />
+          <Diary />
           <HabitSection />
         </div>
       </div>
@@ -258,58 +259,6 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
             })}
           </div>
         </div>
-      )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════
-// Diary Section
-// ══════════════════════════════════════
-function DiarySection({ date }: { date: string }) {
-  const [content, setContent] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    setLoading(true)
-    setSaved(false)
-    fetch(`/api/diary/${date}`)
-      .then(r => r.json())
-      .then(d => { setContent(d.content || ''); setLoading(false); })
-  }, [date])
-
-  const handleSave = async () => {
-    await apiPut(`/api/diary/${date}`, { content })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
-  return (
-    <div>
-      <h3 className="text-sm font-bold text-stone-500 tracking-wider mb-2">DIARY</h3>
-      {loading ? (
-        <p className="text-stone-400 text-sm">読み込み中...</p>
-      ) : (
-        <>
-          <textarea
-            value={content}
-            onChange={e => { setContent(e.target.value); setSaved(false); }}
-            placeholder="今日のことを書いてみよう..."
-            className="w-full h-48 bg-white/70 border border-stone-300 rounded p-3 focus:outline-none focus:ring-2 focus:ring-amber-400/50 resize-none leading-7 text-stone-700 text-sm"
-            style={{
-              backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #d4cdc2 27px, #d4cdc2 28px)',
-              backgroundAttachment: 'local',
-            }}
-          />
-          <div className="flex items-center gap-3 mt-2">
-            <button onClick={handleSave}
-              className="bg-stone-700 text-white px-4 py-1.5 rounded hover:bg-stone-800 text-xs">
-              保存
-            </button>
-            {saved && <span className="text-amber-700 text-xs">保存しました</span>}
-          </div>
-        </>
       )}
     </div>
   )

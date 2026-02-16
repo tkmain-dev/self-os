@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import todosRouter from './routes/todos.js';
-import diaryRouter from './routes/diary.js';
-import scheduleRouter from './routes/schedule.js';
-import habitsRouter from './routes/habits.js';
-import goalsRouter from './routes/goals.js';
+import todosRouter from './routes/todos';
+import diaryRouter from './routes/diary';
+import scheduleRouter from './routes/schedule';
+import habitsRouter from './routes/habits';
+import goalsRouter from './routes/goals';
 
 const app = express();
 const PORT = 3001;
