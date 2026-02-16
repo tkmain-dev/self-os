@@ -116,7 +116,7 @@ export default function DailyPage() {
 
         {/* Right: Diary + Habits */}
         <div className="flex-1 min-w-0 space-y-6">
-          <Diary />
+          <Diary date={date} />
           <HabitSection />
         </div>
       </div>
