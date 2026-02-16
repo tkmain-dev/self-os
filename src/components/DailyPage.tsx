@@ -62,12 +62,12 @@ const END_HOUR = 24
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
 
 const COLORS = [
-  'bg-amber-50 border-amber-600 text-amber-900',
-  'bg-stone-100 border-stone-500 text-stone-800',
-  'bg-orange-50 border-orange-500 text-orange-900',
-  'bg-yellow-50 border-yellow-600 text-yellow-900',
-  'bg-lime-50 border-lime-600 text-lime-900',
-  'bg-emerald-50 border-emerald-600 text-emerald-900',
+  'bg-amber-500/10 border-amber-500 text-amber-300',
+  'bg-slate-500/10 border-slate-400 text-slate-300',
+  'bg-orange-500/10 border-orange-500 text-orange-300',
+  'bg-yellow-500/10 border-yellow-500 text-yellow-300',
+  'bg-lime-500/10 border-lime-500 text-lime-300',
+  'bg-emerald-500/10 border-emerald-500 text-emerald-300',
 ]
 
 function getEventStyle(item: ScheduleItem): React.CSSProperties | null {
@@ -95,13 +95,13 @@ export default function DailyPage() {
   return (
     <div>
       {/* Shared date header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => changeDate(-1)} className="px-3 py-1 bg-stone-200 rounded hover:bg-stone-300 text-stone-600">&larr;</button>
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => changeDate(-1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&larr;</button>
         <h2 className="techo-heading text-2xl min-w-[200px] text-center">{formatDateLabel(date)}</h2>
-        <button onClick={() => changeDate(1)} className="px-3 py-1 bg-stone-200 rounded hover:bg-stone-300 text-stone-600">&rarr;</button>
+        <button onClick={() => changeDate(1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&rarr;</button>
         <button
           onClick={() => setDate(formatDate(new Date()))}
-          className={`px-3 py-1 rounded text-sm ${isToday ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}
+          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${isToday ? 'bg-amber-500 text-black font-semibold' : 'bg-[#1e1e2a] text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'}`}
         >
           今日
         </button>
@@ -174,29 +174,29 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-stone-500 tracking-wider">SCHEDULE</h3>
+        <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">SCHEDULE</h3>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="text-xs bg-stone-700 text-white px-3 py-1 rounded hover:bg-stone-800"
+          className="text-xs bg-amber-500 text-black font-semibold px-3 py-1 rounded-lg hover:bg-amber-400 transition-colors"
         >
           + 追加
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} className="bg-white/80 rounded p-3 shadow-sm mb-3 space-y-2 border border-stone-200">
+        <form onSubmit={handleAdd} className="bg-[#16161e] rounded-xl p-3 shadow-lg mb-3 space-y-2 border border-[#2a2a3a]">
           <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="予定名"
             className="w-full border border-stone-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50" autoFocus />
           <div className="flex gap-2">
             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="border border-stone-300 rounded px-2 py-1.5 text-sm flex-1" />
-            <span className="text-stone-400 self-center">-</span>
+            <span className="text-[#5a5a6e] self-center">-</span>
             <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="border border-stone-300 rounded px-2 py-1.5 text-sm flex-1" />
           </div>
           <input type="text" value={memo} onChange={e => setMemo(e.target.value)} placeholder="メモ"
             className="w-full border border-stone-300 rounded px-2 py-1.5 text-sm" />
           <div className="flex gap-2">
-            <button type="submit" className="bg-stone-700 text-white px-3 py-1 rounded text-xs hover:bg-stone-800">登録</button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1 rounded text-xs text-stone-500 hover:bg-stone-100">取消</button>
+            <button type="submit" className="bg-amber-500 text-black font-semibold px-3 py-1 rounded-lg text-xs hover:bg-amber-400 transition-colors">登録</button>
+            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1 rounded-lg text-xs text-[#8b8b9e] hover:bg-[#252535] transition-colors">取消</button>
           </div>
         </form>
       )}
@@ -215,17 +215,17 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 
       {/* Timeline */}
       {loading ? (
-        <p className="text-stone-400 text-sm">読み込み中...</p>
+        <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
       ) : (
-        <div className="bg-white/80 rounded shadow-sm border border-stone-200 overflow-hidden">
+        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-hidden">
           <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}>
             {HOURS.map(h => (
-              <div key={h} className="absolute w-full border-t border-stone-100 flex"
+              <div key={h} className="absolute w-full border-t border-[#1f1f2e] flex"
                 style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}>
-                <div className="w-11 pr-1 pt-0.5 text-right text-[10px] text-stone-400 shrink-0 select-none">
+                <div className="w-11 pr-1 pt-0.5 text-right text-[10px] text-[#5a5a6e] shrink-0 select-none">
                   {String(h).padStart(2, '0')}:00
                 </div>
-                <div className="flex-1 border-l border-stone-200" />
+                <div className="flex-1 border-l border-[#2a2a3a]" />
               </div>
             ))}
 
@@ -310,33 +310,33 @@ function HabitSection() {
   const isChecked = (habitId: number, date: string) =>
     logs.some(l => l.habit_id === habitId && l.date === date)
 
-  if (loading) return <p className="text-stone-400 text-sm">読み込み中...</p>
+  if (loading) return <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-stone-500 tracking-wider">HABITS</h3>
+        <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">HABITS</h3>
         <form onSubmit={handleAdd} className="flex gap-1">
           <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="新しい習慣..."
             className="bg-white/80 border border-stone-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-amber-400/50" />
-          <button type="submit" className="bg-stone-700 text-white px-2 py-1 rounded text-xs hover:bg-stone-800">追加</button>
+          <button type="submit" className="bg-amber-500 text-black font-semibold px-2 py-1 rounded-lg text-xs hover:bg-amber-400 transition-colors">追加</button>
         </form>
       </div>
 
       {habits.length === 0 ? (
-        <p className="text-stone-400 text-center py-4 text-xs">習慣を追加してみましょう</p>
+        <p className="text-[#5a5a6e] text-center py-4 text-xs">習慣を追加してみましょう</p>
       ) : (
-        <div className="bg-white/80 rounded shadow-sm overflow-auto border border-stone-200">
+        <div className="bg-[#16161e] rounded-xl shadow-lg overflow-auto border border-[#2a2a3a]">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-stone-200">
-                <th className="text-left p-2 min-w-[80px] text-stone-600 text-xs font-medium">習慣</th>
+              <tr className="border-b border-[#2a2a3a]">
+                <th className="text-left p-2 min-w-[80px] text-[#8b8b9e] text-xs font-medium">習慣</th>
                 {days.map(d => {
                   const info = shortDate(d)
                   return (
-                    <th key={d} className={`p-1.5 text-center w-10 ${info.isToday ? 'bg-amber-50' : ''}`}>
-                      <div className={`text-[10px] ${info.isToday ? 'text-amber-700 font-bold' : 'text-stone-400'}`}>{info.date}</div>
-                      <div className={`text-[10px] ${info.isToday ? 'text-amber-600' : 'text-stone-300'}`}>{info.day}</div>
+                    <th key={d} className={`p-1.5 text-center w-10 ${info.isToday ? 'bg-amber-500/5' : ''}`}>
+                      <div className={`text-[10px] ${info.isToday ? 'text-amber-400 font-bold' : 'text-[#5a5a6e]'}`}>{info.date}</div>
+                      <div className={`text-[10px] ${info.isToday ? 'text-amber-400/70' : 'text-[#5a5a6e]/50'}`}>{info.day}</div>
                     </th>
                   )
                 })}
@@ -345,16 +345,16 @@ function HabitSection() {
             </thead>
             <tbody>
               {habits.map(habit => (
-                <tr key={habit.id} className="border-b border-stone-100 last:border-0">
-                  <td className="p-2 font-medium text-stone-700 text-xs">{habit.name}</td>
+                <tr key={habit.id} className="border-b border-[#1f1f2e] last:border-0">
+                  <td className="p-2 font-medium text-[#e4e4ec] text-xs">{habit.name}</td>
                   {days.map(d => {
                     const info = shortDate(d)
                     const checked = isChecked(habit.id, d)
                     return (
-                      <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-50' : ''}`}>
+                      <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
                         <button onClick={() => handleToggle(habit.id, d)}
                           className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
-                            checked ? 'bg-amber-600 border-amber-600 text-white' : 'border-stone-300 hover:border-amber-500'
+                            checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
                           }`}>
                           {checked ? '✓' : ''}
                         </button>
@@ -362,7 +362,7 @@ function HabitSection() {
                     )
                   })}
                   <td className="p-1.5">
-                    <button onClick={() => handleDeleteHabit(habit.id)} className="text-stone-300 hover:text-red-500 text-xs">&times;</button>
+                    <button onClick={() => handleDeleteHabit(habit.id)} className="text-[#5a5a6e] hover:text-red-400 text-xs">&times;</button>
                   </td>
                 </tr>
               ))}

@@ -27,30 +27,30 @@ interface TreeNode extends Goal {
 
 // ── Constants ──
 const ISSUE_TYPES = {
-  epic:    { label: 'エピック', icon: '⚡', color: 'text-purple-600', bg: 'bg-purple-100' },
-  task:    { label: 'タスク',   icon: '✓',  color: 'text-blue-600',   bg: 'bg-blue-100' },
-  subtask: { label: 'サブタスク', icon: '•', color: 'text-stone-500',  bg: 'bg-stone-100' },
+  epic:    { label: 'エピック', icon: '⚡', color: 'text-purple-400', bg: 'bg-purple-900/30' },
+  task:    { label: 'タスク',   icon: '✓',  color: 'text-blue-400',   bg: 'bg-blue-900/30' },
+  subtask: { label: 'サブタスク', icon: '•', color: 'text-slate-400',  bg: 'bg-slate-700/30' },
 }
 
 const STATUSES = {
-  todo:        { label: 'TODO',  bg: 'bg-stone-200', text: 'text-stone-700' },
-  in_progress: { label: '進行中', bg: 'bg-blue-100',  text: 'text-blue-700' },
-  done:        { label: '完了',   bg: 'bg-green-100', text: 'text-green-700' },
+  todo:        { label: 'TODO',  bg: 'bg-slate-700', text: 'text-slate-300' },
+  in_progress: { label: '進行中', bg: 'bg-blue-900/50',  text: 'text-blue-300' },
+  done:        { label: '完了',   bg: 'bg-green-900/50', text: 'text-green-300' },
 }
 
 const PRIORITIES = {
-  high:   { label: '高', icon: '↑', color: 'text-red-500' },
-  medium: { label: '中', icon: '→', color: 'text-amber-500' },
+  high:   { label: '高', icon: '↑', color: 'text-red-400' },
+  medium: { label: '中', icon: '→', color: 'text-amber-400' },
   low:    { label: '低', icon: '↓', color: 'text-blue-400' },
 }
 
 const COLOR_MAP: Record<string, { bg: string; bar: string; text: string }> = {
-  amber:  { bg: 'bg-amber-100',  bar: 'bg-amber-500',  text: 'text-amber-900' },
-  blue:   { bg: 'bg-blue-100',   bar: 'bg-blue-500',   text: 'text-blue-900' },
-  green:  { bg: 'bg-green-100',  bar: 'bg-green-500',  text: 'text-green-900' },
-  purple: { bg: 'bg-purple-100', bar: 'bg-purple-500', text: 'text-purple-900' },
-  rose:   { bg: 'bg-rose-100',   bar: 'bg-rose-500',   text: 'text-rose-900' },
-  teal:   { bg: 'bg-teal-100',   bar: 'bg-teal-500',   text: 'text-teal-900' },
+  amber:  { bg: 'bg-amber-500/15',  bar: 'bg-amber-500',  text: 'text-amber-300' },
+  blue:   { bg: 'bg-blue-500/15',   bar: 'bg-blue-500',   text: 'text-blue-300' },
+  green:  { bg: 'bg-green-500/15',  bar: 'bg-green-500',  text: 'text-green-300' },
+  purple: { bg: 'bg-purple-500/15', bar: 'bg-purple-500', text: 'text-purple-300' },
+  rose:   { bg: 'bg-rose-500/15',   bar: 'bg-rose-500',   text: 'text-rose-300' },
+  teal:   { bg: 'bg-teal-500/15',   bar: 'bg-teal-500',   text: 'text-teal-300' },
 }
 
 const COLORS = Object.keys(COLOR_MAP)
@@ -403,7 +403,7 @@ export default function GoalGantt() {
     document.addEventListener('mouseup', onMouseUp)
   }, [])
 
-  if (loading) return <p className="text-stone-400">読み込み中...</p>
+  if (loading) return <p className="text-[#5a5a6e]">読み込み中...</p>
 
   const ROW_H = 'h-11'
 
@@ -412,36 +412,36 @@ export default function GoalGantt() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <h2 className="techo-heading text-2xl mr-2">目標管理 (WBS)</h2>
-        <div className="flex gap-1 bg-stone-200 rounded p-0.5">
+        <div className="flex gap-1 bg-[#1e1e2a] rounded-lg p-0.5">
           {(['1m', '3m', '6m', '1y'] as ViewRange[]).map(r => (
             <button key={r} onClick={() => { setViewRange(r); setOffset(0) }}
-              className={`px-2.5 py-1 rounded text-xs transition-colors ${viewRange === r ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${viewRange === r ? 'bg-[#16161e] text-[#e4e4ec] shadow-sm' : 'text-[#8b8b9e] hover:text-[#e4e4ec]'}`}>
               {r === '1m' ? '1ヶ月' : r === '3m' ? '3ヶ月' : r === '6m' ? '半年' : '1年'}
             </button>
           ))}
         </div>
         <div className="flex gap-1">
-          <button onClick={() => setOffset(o => o - 1)} className="px-2 py-1 bg-stone-200 rounded hover:bg-stone-300 text-stone-600 text-xs">&larr;</button>
-          <button onClick={() => setOffset(0)} className="px-2 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 text-xs">今月</button>
-          <button onClick={() => setOffset(o => o + 1)} className="px-2 py-1 bg-stone-200 rounded hover:bg-stone-300 text-stone-600 text-xs">&rarr;</button>
+          <button onClick={() => setOffset(o => o - 1)} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&larr;</button>
+          <button onClick={() => setOffset(0)} className="px-2 py-1 bg-[#1e1e2a] text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/10 text-xs transition-colors">今月</button>
+          <button onClick={() => setOffset(o => o + 1)} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&rarr;</button>
         </div>
         {selected.size > 0 && (
           <button onClick={handleBulkDelete}
-            className="ml-auto bg-red-600 text-white px-4 py-1.5 rounded hover:bg-red-700 text-sm">
+            className="ml-auto bg-red-600 text-white px-4 py-1.5 rounded-lg hover:bg-red-500 text-sm transition-colors">
             {selected.size}件を削除
           </button>
         )}
         <button onClick={() => { resetForm(); setShowForm(!showForm) }}
-          className={`${selected.size === 0 ? 'ml-auto' : ''} bg-stone-700 text-white px-4 py-1.5 rounded hover:bg-stone-800 text-sm`}>
+          className={`${selected.size === 0 ? 'ml-auto' : ''} bg-amber-500 text-black font-semibold px-4 py-1.5 rounded-lg hover:bg-amber-400 text-sm transition-colors`}>
           + 作成
         </button>
       </div>
 
       {/* Add/Edit form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white/80 rounded p-4 shadow-sm mb-4 border border-stone-200">
+        <form onSubmit={handleSubmit} className="bg-[#16161e] rounded-xl p-4 shadow-lg mb-4 border border-[#2a2a3a]">
           {addParentId && !editId && (
-            <p className="text-xs text-stone-500 mb-2">
+            <p className="text-xs text-[#8b8b9e] mb-2">
               親アイテム ID: {addParentId} の子として追加
             </p>
           )}
@@ -471,19 +471,19 @@ export default function GoalGantt() {
             <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="カテゴリ"
               className="w-32 border border-stone-300 rounded px-3 py-2" />
             <div>
-              <label className="text-xs text-stone-500">開始</label>
+              <label className="text-xs text-[#8b8b9e]">開始</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="block border border-stone-300 rounded px-3 py-2" />
             </div>
             <div>
-              <label className="text-xs text-stone-500">終了</label>
+              <label className="text-xs text-[#8b8b9e]">終了</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="block border border-stone-300 rounded px-3 py-2" />
             </div>
             <div>
-              <label className="text-xs text-stone-500">色</label>
+              <label className="text-xs text-[#8b8b9e]">色</label>
               <div className="flex gap-1 mt-1">
                 {COLORS.map(c => (
                   <button key={c} type="button" onClick={() => setColor(c)}
-                    className={`w-6 h-6 rounded-full ${COLOR_MAP[c].bar} ${color === c ? 'ring-2 ring-offset-1 ring-stone-600' : 'opacity-60 hover:opacity-100'}`} />
+                    className={`w-6 h-6 rounded-full ${COLOR_MAP[c].bar} ${color === c ? 'ring-2 ring-offset-1 ring-offset-[#16161e] ring-[#e4e4ec]' : 'opacity-60 hover:opacity-100'}`} />
                 ))}
               </div>
             </div>
@@ -491,29 +491,29 @@ export default function GoalGantt() {
           <input type="text" value={memo} onChange={e => setMemo(e.target.value)} placeholder="メモ（任意）"
             className="w-full border border-stone-300 rounded px-3 py-2 mb-3" />
           <div className="flex gap-2">
-            <button type="submit" className="bg-stone-700 text-white px-4 py-2 rounded hover:bg-stone-800 text-sm">
+            <button type="submit" className="bg-amber-500 text-black font-semibold px-4 py-2 rounded-lg hover:bg-amber-400 text-sm transition-colors">
               {editId ? '更新' : '追加'}
             </button>
-            <button type="button" onClick={() => { setShowForm(false); resetForm() }} className="px-4 py-2 rounded text-stone-500 hover:bg-stone-100 text-sm">キャンセル</button>
+            <button type="button" onClick={() => { setShowForm(false); resetForm() }} className="px-4 py-2 rounded-lg text-[#8b8b9e] hover:bg-[#252535] text-sm transition-colors">キャンセル</button>
           </div>
         </form>
       )}
 
       {/* WBS Gantt */}
       {goals && goals.length === 0 ? (
-        <p className="text-stone-400 text-center mt-12 text-sm">目標を追加して、WBSを作成しましょう</p>
+        <p className="text-[#5a5a6e] text-center mt-12 text-sm">目標を追加して、WBSを作成しましょう</p>
       ) : (
-        <div className="bg-white/80 rounded shadow-sm border border-stone-200 overflow-auto">
+        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-auto">
           <div className="flex min-w-fit">
             {/* Left: WBS table */}
-            <div className="w-[508px] shrink-0 border-r border-stone-300">
+            <div className="w-[508px] shrink-0 border-r border-[#2a2a3a]">
               {/* Table header */}
-              <div className={`${ROW_H} flex items-center border-b border-stone-300 bg-stone-100 text-xs font-bold text-stone-600`}>
+              <div className={`${ROW_H} flex items-center border-b border-[#2a2a3a] bg-[#1e1e2a] text-xs font-bold text-[#8b8b9e]`}>
                 <div className="w-7 flex items-center justify-center shrink-0">
                   <input type="checkbox"
                     checked={flatList.length > 0 && selected.size === flatList.length}
                     onChange={toggleSelectAll}
-                    className="w-3.5 h-3.5 accent-amber-600 cursor-pointer" />
+                    className="w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
                 </div>
                 <div className="w-8 text-center shrink-0">種別</div>
                 <div className="flex-1 px-2">タイトル</div>
@@ -533,13 +533,13 @@ export default function GoalGantt() {
                 const progress = hasChildren ? calcProgress(node) : (node.status === 'done' ? 100 : node.progress)
 
                 return (
-                  <div key={node.id} className={`${ROW_H} flex items-center border-b border-stone-100 hover:bg-stone-50 group text-xs ${selected.has(node.id) ? 'bg-amber-50' : ''}`}>
+                  <div key={node.id} className={`${ROW_H} flex items-center border-b border-[#1f1f2e] hover:bg-[#1e1e2a] group text-xs ${selected.has(node.id) ? 'bg-amber-500/5' : ''}`}>
                     {/* Checkbox */}
                     <div className="w-7 flex items-center justify-center shrink-0">
                       <input type="checkbox"
                         checked={selected.has(node.id)}
                         onChange={() => toggleSelect(node.id)}
-                        className="w-3.5 h-3.5 accent-amber-600 cursor-pointer" />
+                        className="w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
                     </div>
                     {/* Type icon */}
                     <div className={`w-8 text-center shrink-0 ${it.color} font-bold`} title={it.label}>
@@ -551,7 +551,7 @@ export default function GoalGantt() {
                       style={{ paddingLeft: `${node.depth * 20 + 4}px` }}>
                       {hasChildren ? (
                         <button onClick={() => toggleCollapse(node.id)}
-                          className="w-4 h-4 flex items-center justify-center text-stone-400 hover:text-stone-700 shrink-0 mr-1">
+                          className="w-4 h-4 flex items-center justify-center text-[#5a5a6e] hover:text-[#e4e4ec] shrink-0 mr-1">
                           {isCollapsed ? '▸' : '▾'}
                         </button>
                       ) : (
@@ -569,7 +569,7 @@ export default function GoalGantt() {
                         />
                       ) : (
                         <span
-                          className={`truncate cursor-pointer hover:text-amber-700 ${node.issue_type === 'epic' ? 'font-bold' : ''} ${node.status === 'done' ? 'line-through text-stone-400' : ''}`}
+                          className={`truncate cursor-pointer hover:text-amber-400 ${node.issue_type === 'epic' ? 'font-bold' : ''} ${node.status === 'done' ? 'line-through text-[#5a5a6e]' : ''}`}
                           title={node.title}
                           onClick={() => openEdit(node)}>
                           {node.title}
@@ -595,7 +595,7 @@ export default function GoalGantt() {
                     </div>
 
                     {/* Progress */}
-                    <div className="w-12 text-center shrink-0 text-stone-500">
+                    <div className="w-12 text-center shrink-0 text-[#8b8b9e]">
                       {progress}%
                     </div>
 
@@ -603,12 +603,12 @@ export default function GoalGantt() {
                     <div className="w-16 shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 justify-center">
                       {node.issue_type !== 'subtask' && (
                         <button onClick={() => openAddChild(node.id, node.issue_type)}
-                          className="text-stone-400 hover:text-blue-600" title="子を追加">+</button>
+                          className="text-[#5a5a6e] hover:text-blue-400" title="子を追加">+</button>
                       )}
                       <button onClick={() => openEdit(node)}
-                        className="text-stone-400 hover:text-stone-700" title="編集">✎</button>
+                        className="text-[#5a5a6e] hover:text-[#e4e4ec]" title="編集">✎</button>
                       <button onClick={() => handleDelete(node.id)}
-                        className="text-stone-300 hover:text-red-500" title="削除">&times;</button>
+                        className="text-[#5a5a6e] hover:text-red-400" title="削除">&times;</button>
                     </div>
                   </div>
                 )
@@ -619,9 +619,9 @@ export default function GoalGantt() {
             <div className="flex-1 min-w-0">
               <div style={{ width: `${view.days * DAY_WIDTH}px` }}>
                 {/* Month headers */}
-                <div className={`${ROW_H} relative border-b border-stone-300 flex bg-stone-100`}>
+                <div className={`${ROW_H} relative border-b border-[#2a2a3a] flex bg-[#1e1e2a]`}>
                   {months.map((m, i) => (
-                    <div key={i} className="border-r border-stone-200 flex items-center justify-center text-xs text-stone-500 font-medium"
+                    <div key={i} className="border-r border-[#1f1f2e] flex items-center justify-center text-xs text-[#8b8b9e] font-medium"
                       style={{ width: `${m.width * DAY_WIDTH}px` }}>
                       {m.label}
                     </div>
@@ -632,7 +632,7 @@ export default function GoalGantt() {
                 <div className="relative">
                   {/* Today line */}
                   {todayOffset >= 0 && todayOffset < view.days && (
-                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-20 pointer-events-none"
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
                       style={{ left: `${todayOffset * DAY_WIDTH + DAY_WIDTH / 2}px` }} />
                   )}
 
@@ -655,10 +655,10 @@ export default function GoalGantt() {
                     const isDragging = dd !== null
 
                     return (
-                      <div key={node.id} className={`${ROW_H} relative border-b border-stone-100`}>
+                      <div key={node.id} className={`${ROW_H} relative border-b border-[#1f1f2e]`}>
                         {/* Week grid */}
                         {Array.from({ length: Math.ceil(view.days / 7) }, (_, i) => (
-                          <div key={i} className="absolute top-0 bottom-0 border-l border-stone-100"
+                          <div key={i} className="absolute top-0 bottom-0 border-l border-[#1f1f2e]"
                             style={{ left: `${i * 7 * DAY_WIDTH}px` }} />
                         ))}
 
@@ -703,11 +703,11 @@ export default function GoalGantt() {
                             // Leaf task/subtask: draggable bar
                             <div className={`absolute top-2 h-7 ${c.bg} rounded-sm flex items-center group/bar ${isDragging ? 'opacity-80 cursor-grabbing' : ''}`}
                               style={{ left: `${barLeft}px`, width: `${barWidth}px` }}>
-                              <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 hover:bg-black/10 rounded-l-sm"
+                              <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 hover:bg-white/10 rounded-l-sm"
                                 onMouseDown={e => handleBarMouseDown(e, node, 'resize-left')} />
                               <div className="absolute left-2 right-2 top-0 bottom-0 cursor-grab z-10"
                                 onMouseDown={e => handleBarMouseDown(e, node, 'move')} />
-                              <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 hover:bg-black/10 rounded-r-sm"
+                              <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 hover:bg-white/10 rounded-r-sm"
                                 onMouseDown={e => handleBarMouseDown(e, node, 'resize-right')} />
                               <div className={`absolute inset-0 ${c.bar} opacity-30 rounded-sm pointer-events-none`}
                                 style={{ width: `${progress}%` }} />

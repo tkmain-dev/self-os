@@ -15,11 +15,11 @@ const nav = [
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen">
-      <aside className="sidebar w-48 p-4 flex flex-col shadow-lg">
-        <h1 className="text-xl font-bold mb-0.5 text-white tracking-widest">手 帳</h1>
-        <div className="w-12 h-0.5 bg-amber-600 mb-2" />
-        <p className="text-xs text-amber-200/70 mb-6 tracking-wide">{today()}</p>
-        <nav className="flex flex-col gap-0.5">
+      <aside className="sidebar w-52 p-5 flex flex-col shadow-2xl">
+        <h1 className="text-xl font-bold mb-0.5 text-white tracking-[0.25em]">手 帳</h1>
+        <div className="w-10 h-0.5 bg-amber-500 mb-2" />
+        <p className="text-xs text-[#8b8b9e] mb-8 tracking-wide">{today()}</p>
+        <nav className="flex flex-col gap-1">
           {nav.map(n => (
             <NavLink
               key={n.to}
@@ -31,11 +31,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto pt-4 border-t border-white/10">
-          <p className="text-xs text-white/30 text-center">My Techo</p>
+        <div className="mt-auto pt-4 border-t border-[#2a2a3a]">
+          <p className="text-xs text-[#5a5a6e] text-center">My Techo</p>
         </div>
       </aside>
-      <main className="page-area flex-1 overflow-auto p-6">
+      <main className="page-area flex-1 overflow-auto p-8">
         {children}
       </main>
     </div>

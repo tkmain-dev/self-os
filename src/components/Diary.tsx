@@ -145,29 +145,29 @@ export default function Diary({ date }: { date: string }) {
 
   return (
     <div className="max-w-4xl">
-      <h2 className="techo-heading text-2xl mb-5">日記</h2>
+      <h2 className="techo-heading text-2xl mb-4">日記</h2>
 
       {loading ? (
-        <p className="text-stone-400">読み込み中...</p>
+        <p className="text-[#5a5a6e]">読み込み中...</p>
       ) : (
         <>
-          <div className="bg-white/70 border border-stone-300 rounded p-4 min-h-[500px]">
+          <div className="bg-[#16161e] border border-[#2a2a3a] rounded-xl p-4 min-h-[500px] shadow-lg">
             <BlockNoteView
               editor={editor}
-              theme="light"
+              theme="dark"
               data-theming-css-variables-demo
             />
           </div>
           <div className="flex items-center gap-3 mt-3">
             <button
               onClick={handleSave}
-              className="bg-stone-700 text-white px-6 py-2 rounded hover:bg-stone-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-amber-500 text-black font-semibold px-6 py-2 rounded-lg hover:bg-amber-400 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               disabled={!hasChanges}
             >
               保存
             </button>
-            {saved && <span className="text-amber-700 text-sm">保存しました</span>}
-            {hasChanges && !saved && <span className="text-stone-500 text-sm">未保存の変更があります</span>}
+            {saved && <span className="text-amber-400 text-sm">保存しました</span>}
+            {hasChanges && !saved && <span className="text-[#8b8b9e] text-sm">未保存の変更があります</span>}
           </div>
         </>
       )}
