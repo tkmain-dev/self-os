@@ -80,6 +80,13 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 
+  CREATE TABLE IF NOT EXISTS monthly_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL UNIQUE,
+    content TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
   CREATE TABLE IF NOT EXISTS wish_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     list_type TEXT NOT NULL DEFAULT 'wish'

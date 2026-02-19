@@ -38,7 +38,9 @@ erDiagram
 
     HABITS {
         int id PK
+        int parent_id FK
         string name
+        int sort_order
         string created_at
     }
 
@@ -46,6 +48,13 @@ erDiagram
         int id PK
         int habit_id FK
         string date
+    }
+
+    MONTHLY_GOALS {
+        int id PK
+        string year_month UK
+        string content
+        string updated_at
     }
 
     GOALS {
@@ -89,6 +98,7 @@ erDiagram
     }
 
     HABITS ||--o{ HABIT_LOGS : "has"
+    HABITS ||--o{ HABITS : "parent_id"
     GOALS ||--o{ GOALS : "parent_id"
 ```
 
@@ -133,8 +143,14 @@ erDiagram
 | カラム名 | 型 | 制約 | 説明 |
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 習慣ID |
+| parent_id | INTEGER | NULL, FK → habits(id) ON DELETE CASCADE | 親習慣ID |
 | name | TEXT | NOT NULL | 習慣名 |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+
+- **階層構造**: `parent_id` による親子関係。親習慣（グループ）と子習慣の2階層
+- **カスケード削除**: 親習慣削除時に子習慣・関連ログも自動削除
+- **ソート**: 同一親グループ内で `sort_order ASC, id ASC`
 
 ### habit_logs（習慣ログ）
 
@@ -184,6 +200,18 @@ erDiagram
 
 - **ステータス**: `pending` / `in_progress` / `done` / `rejected`（CHECK 制約）
 - **commit_message**: git push 完了後に `<hash> <subject>` 形式で記録（例: `abc1234 feat: ダイアリーチェックリスト実装`）
+
+### monthly_goals（月の目標）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| year_month | TEXT | NOT NULL, UNIQUE | 年月（YYYY-MM） |
+| content | TEXT | NOT NULL, DEFAULT '' | 目標内容（自由記載テキスト） |
+| updated_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 更新日時 |
+
+- 月ごとに1レコード（UPSERT で管理）
+- `content` は自由記載の単行テキストを想定
 
 ### wish_items（ウィッシュアイテム）
 

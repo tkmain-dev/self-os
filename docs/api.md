@@ -19,6 +19,7 @@
 | 目標 | `/api/goals` | `server/routes/goals.ts` |
 | Feature Request | `/api/feature-requests` | `server/routes/featureRequests.ts` |
 | ウィッシュアイテム | `/api/wish-items` | `server/routes/wishItems.ts` |
+| 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
 
 ---
 
@@ -118,16 +119,29 @@
 ## 習慣 API (`/api/habits`)
 
 ### GET `/api/habits`
-全習慣を取得。ソート: `created_at ASC`
+全習慣をフラット配列で取得。ソート: `sort_order ASC, created_at ASC`
+フロントエンドで `buildHabitTree()` により親子ツリーに変換する。
+
+**レスポンス**: `200`
+```json
+[{ "id": 1, "parent_id": null, "name": "運動", "sort_order": 1, "created_at": "..." }]
+```
 
 ### POST `/api/habits`
-習慣を作成。
+習慣を作成。`parent_id` を指定すると子習慣として登録。
 
-**リクエスト**: `{ "name": "運動" }`
+**リクエスト**: `{ "name": "ランニング", "parent_id": 1 }`
+`parent_id` はオプション（省略でルート習慣）。`sort_order` は同一親グループ内の最大値+1 が自動設定。
 **レスポンス**: `201`
 
+### PATCH `/api/habits/:id`
+習慣名を更新。
+
+**リクエスト**: `{ "name": "新しい習慣名" }`
+**レスポンス**: `200`
+
 ### DELETE `/api/habits/:id`
-習慣を削除。関連ログも CASCADE 削除。**レスポンス**: `204`
+習慣を削除。子習慣・関連ログも CASCADE 削除。**レスポンス**: `204`
 
 ### GET `/api/habits/logs`
 習慣ログを取得。
@@ -319,6 +333,26 @@ Feature Request を削除。**レスポンス**: `204`
 並び順を一括更新。
 
 **リクエスト**: `{ "orders": [{ "id": 1, "sort_order": 0 }] }`
+
+---
+
+## 月の目標 API (`/api/monthly-goals`)
+
+### GET `/api/monthly-goals/:yearMonth`
+指定月の目標を取得。存在しない場合は `{ year_month, content: "" }` を返す。
+
+**パラメータ**: `yearMonth` — YYYY-MM（例: `2026-02`）
+
+**レスポンス**: `200`
+```json
+{ "id": 1, "year_month": "2026-02", "content": "今月の目標テキスト", "updated_at": "..." }
+```
+
+### PUT `/api/monthly-goals/:yearMonth`
+月の目標を保存・更新（UPSERT）。
+
+**リクエスト**: `{ "content": "今月の目標テキスト" }`
+**レスポンス**: `200`（更新後のレコード）
 
 ---
 

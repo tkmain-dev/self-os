@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { apiPost, apiPut, apiDelete } from '../hooks/useApi'
 import Diary from './Diary'
 
@@ -28,15 +28,6 @@ interface HabitLog {
   date: string
 }
 
-interface Goal {
-  id: number
-  title: string
-  issue_type: string
-  status: string
-  start_date: string
-  end_date: string
-  parent_id: number | null
-}
 
 // ── Helpers ──
 const formatDate = (d: Date) => d.toISOString().split('T')[0]
@@ -121,6 +112,7 @@ export default function DailyPage() {
         >
           今日
         </button>
+        <MonthlyGoalBadge />
       </div>
 
       {/* Two-column layout – stacks on narrow, side-by-side on wide */}
@@ -134,7 +126,6 @@ export default function DailyPage() {
         <div className="flex-1 min-w-0 w-full space-y-6">
           <Diary date={date} />
           <HabitSection />
-          <MonthlyGoalsSection />
         </div>
       </div>
     </div>
@@ -308,9 +299,10 @@ function HabitSection() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [logs, setLogs] = useState<HabitLog[]>([])
   const [name, setName] = useState('')
-  const [parentId, setParentId] = useState<number | ''>('')
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
+  // inline child-add: habitId → current input value
+  const [inlineAdd, setInlineAdd] = useState<Record<number, string>>({})
 
   const days = getLast7Days()
 
@@ -328,13 +320,23 @@ function HabitSection() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Add root-level habit
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    const body: { name: string; parent_id?: number } = { name: name.trim() }
-    if (parentId !== '') body.parent_id = parentId as number
-    await apiPost('/api/habits', body)
+    await apiPost('/api/habits', { name: name.trim() })
     setName('')
+    fetchData()
+  }
+
+  // Add child habit inline under parentId
+  const handleAddChild = async (parentId: number) => {
+    const childName = inlineAdd[parentId]?.trim()
+    if (!childName) return
+    await apiPost('/api/habits', { name: childName, parent_id: parentId })
+    setInlineAdd(prev => { const n = { ...prev }; delete n[parentId]; return n })
+    // Ensure parent is expanded
+    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
     fetchData()
   }
 
@@ -360,12 +362,15 @@ function HabitSection() {
     })
   }
 
+  const openInlineAdd = (parentId: number) => {
+    setInlineAdd(prev => prev[parentId] !== undefined ? prev : { ...prev, [parentId]: '' })
+    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
+  }
+
   const isChecked = (habitId: number, date: string) =>
     logs.some(l => l.habit_id === habitId && l.date === date)
 
   const tree = buildHabitTree(habits)
-  // Root habits with no children (for parent selector)
-  const rootHabits = habits.filter(h => h.parent_id === null)
 
   if (loading) return <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
 
@@ -384,13 +389,8 @@ function HabitSection() {
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">HABITS</h3>
         <form onSubmit={handleAdd} className="flex gap-1 items-center">
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="習慣名..."
-            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-1 text-xs w-28 focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-[#e4e4ec] placeholder:text-[#3a3a4e]" />
-          <select value={parentId} onChange={e => setParentId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-1 py-1 text-xs text-[#8b8b9e] focus:outline-none focus:ring-2 focus:ring-amber-400/50 max-w-[80px]">
-            <option value="">グループなし</option>
-            {rootHabits.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="新しい習慣..."
+            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-[#e4e4ec] placeholder:text-[#3a3a4e]" />
           <button type="submit" className="bg-amber-500 text-black font-semibold px-2 py-1 rounded-lg text-xs hover:bg-amber-400 transition-colors">追加</button>
         </form>
       </div>
@@ -402,7 +402,7 @@ function HabitSection() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a3a]">
-                <th className="text-left p-2 min-w-[100px] text-[#8b8b9e] text-xs font-medium">習慣</th>
+                <th className="text-left p-2 min-w-[130px] text-[#8b8b9e] text-xs font-medium">習慣</th>
                 {days.map(d => {
                   const info = shortDate(d)
                   return (
@@ -412,63 +412,97 @@ function HabitSection() {
                     </th>
                   )
                 })}
-                <th className="w-8"></th>
               </tr>
             </thead>
             <tbody>
               {flatRows.map(({ node, depth }) => {
-                const isGroup = node.children.length > 0
+                const isGroup = node.children.length > 0 || inlineAdd[node.id] !== undefined
+                const hasChildren = node.children.length > 0
                 const isCollapsed = collapsed.has(node.id)
+                const showingInlineAdd = inlineAdd[node.id] !== undefined
                 return (
-                  <tr key={node.id} className={`border-b border-[#1f1f2e] last:border-0 ${isGroup ? 'bg-[#0e0e12]/60' : ''}`}>
-                    <td className="p-2 text-xs" style={{ paddingLeft: `${depth * 16 + 8}px` }}>
-                      <div className="flex items-center gap-1">
-                        {isGroup ? (
-                          <button onClick={() => toggleCollapse(node.id)}
-                            className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center leading-none">
-                            {isCollapsed ? '▸' : '▾'}
-                          </button>
-                        ) : (
-                          <span className="w-4 shrink-0" />
-                        )}
-                        <span className={isGroup ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
-                          {node.name}
-                        </span>
-                      </div>
-                    </td>
-                    {days.map(d => {
-                      const info = shortDate(d)
-                      if (isGroup) {
-                        // Show completion count for group's children on this day
-                        const childIds = node.children.map(c => c.id)
-                        const doneCount = childIds.filter(cid => isChecked(cid, d)).length
+                  <React.Fragment key={node.id}>
+                    <tr className={`border-b border-[#1f1f2e] last:border-0 ${hasChildren ? 'bg-[#0e0e12]/60' : ''}`}>
+                      <td className="p-2 text-xs" style={{ paddingLeft: `${depth * 16 + 8}px` }}>
+                        <div className="flex items-center gap-1.5">
+                          {hasChildren ? (
+                            <button onClick={() => toggleCollapse(node.id)}
+                              className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center leading-none">
+                              {isCollapsed ? '▸' : '▾'}
+                            </button>
+                          ) : (
+                            <span className="w-4 shrink-0" />
+                          )}
+                          <span className={hasChildren ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
+                            {node.name}
+                          </span>
+                          <span className="flex items-center gap-1 ml-1">
+                            {!showingInlineAdd && (
+                              <button onClick={() => openInlineAdd(node.id)}
+                                title="子習慣を追加"
+                                className="text-[#3a3a4e] hover:text-amber-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
+                                +
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteHabit(node.id, isGroup)}
+                              className="text-[#5a5a6e] hover:text-red-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
+                              &times;
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                      {days.map(d => {
+                        const info = shortDate(d)
+                        if (hasChildren) {
+                          const childIds = node.children.map(c => c.id)
+                          const doneCount = childIds.filter(cid => isChecked(cid, d)).length
+                          return (
+                            <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
+                              {childIds.length > 0 && (
+                                <span className={`text-[10px] font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
+                                  {doneCount}/{childIds.length}
+                                </span>
+                              )}
+                            </td>
+                          )
+                        }
+                        const checked = isChecked(node.id, d)
                         return (
                           <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                            {childIds.length > 0 && (
-                              <span className={`text-[10px] font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
-                                {doneCount}/{childIds.length}
-                              </span>
-                            )}
+                            <button onClick={() => handleToggle(node.id, d)}
+                              className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
+                                checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
+                              }`}>
+                              {checked ? '✓' : ''}
+                            </button>
                           </td>
                         )
-                      }
-                      const checked = isChecked(node.id, d)
-                      return (
-                        <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                          <button onClick={() => handleToggle(node.id, d)}
-                            className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
-                              checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
-                            }`}>
-                            {checked ? '✓' : ''}
-                          </button>
+                      })}
+                    </tr>
+                    {/* Inline child-add row */}
+                    {showingInlineAdd && (
+                      <tr className="border-b border-[#1f1f2e] bg-[#0e0e12]/40">
+                        <td colSpan={days.length + 1} style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }} className="py-1.5 pr-3">
+                          <form onSubmit={e => { e.preventDefault(); handleAddChild(node.id) }} className="flex gap-1 items-center">
+                            <span className="text-[#3a3a4e] text-xs mr-0.5">└</span>
+                            <input
+                              autoFocus
+                              value={inlineAdd[node.id] ?? ''}
+                              onChange={e => setInlineAdd(prev => ({ ...prev, [node.id]: e.target.value }))}
+                              placeholder="子習慣名..."
+                              className="flex-1 bg-transparent border-b border-[#2a2a3a] focus:border-amber-500/50 text-xs text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none py-0.5"
+                              onKeyDown={e => {
+                                if (e.key === 'Escape') setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })
+                              }}
+                            />
+                            <button type="submit" className="text-xs text-amber-500 hover:text-amber-400 px-1">追加</button>
+                            <button type="button" onClick={() => setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })}
+                              className="text-[10px] text-[#5a5a6e] hover:text-[#8b8b9e]">キャンセル</button>
+                          </form>
                         </td>
-                      )
-                    })}
-                    <td className="p-1.5">
-                      <button onClick={() => handleDeleteHabit(node.id, isGroup)}
-                        className="text-[#5a5a6e] hover:text-red-400 text-xs">&times;</button>
-                    </td>
-                  </tr>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )
               })}
             </tbody>
@@ -480,103 +514,81 @@ function HabitSection() {
 }
 
 // ══════════════════════════════════════
-// Monthly Goals Section
+// Monthly Goal Badge — compact header inline
 // ══════════════════════════════════════
-function MonthlyGoalsSection() {
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [open, setOpen] = useState(true)
-  const [loading, setLoading] = useState(true)
+function MonthlyGoalBadge() {
+  const now = new Date()
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const [content, setContent] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch('/api/goals').then(r => r.json()).then((data: Goal[]) => {
-      setGoals(data)
-      setLoading(false)
-    })
-  }, [])
+    fetch(`/api/monthly-goals/${yearMonth}`)
+      .then(r => r.json())
+      .then(d => setContent(d.content ?? ''))
+  }, [yearMonth])
 
-  const today = new Date()
-  const thisYear = today.getFullYear()
-  const thisMonth = today.getMonth() // 0-indexed
-  const thisMonthStart = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`
-  const thisMonthEnd = new Date(thisYear, thisMonth + 1, 0).toISOString().split('T')[0]
-
-  const lastMonthDate = new Date(thisYear, thisMonth - 1, 1)
-  const lastMonthStart = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}-01`
-  const lastMonthEnd = new Date(thisYear, thisMonth, 0).toISOString().split('T')[0]
-
-  const inRange = (g: Goal, from: string, to: string) =>
-    g.start_date <= to && g.end_date >= from
-
-  const isTopLevel = (g: Goal) => g.parent_id === null || g.issue_type === 'epic'
-
-  const thisMonthGoals = goals.filter(g => inRange(g, thisMonthStart, thisMonthEnd) && isTopLevel(g))
-  const lastMonthGoals = goals.filter(g => inRange(g, lastMonthStart, lastMonthEnd) && isTopLevel(g))
-
-  const statusBadge = (status: string) => {
-    if (status === 'done') return 'bg-emerald-500/20 text-emerald-400'
-    if (status === 'in_progress') return 'bg-amber-500/20 text-amber-400'
-    return 'bg-[#2a2a3a] text-[#5a5a6e]'
-  }
-  const statusLabel = (status: string) => {
-    if (status === 'done') return '完了'
-    if (status === 'in_progress') return '進行中'
-    return '未着手'
+  const startEdit = () => {
+    setDraft(content)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.focus(), 0)
   }
 
-  const monthLabel = (year: number, month: number) => `${year === thisYear ? '' : year + '年'}${month + 1}月`
+  const save = async () => {
+    const trimmed = draft.trim()
+    await apiPut(`/api/monthly-goals/${yearMonth}`, { content: trimmed })
+    setContent(trimmed)
+    setEditing(false)
+  }
 
-  if (loading) return null
-  if (thisMonthGoals.length === 0 && lastMonthGoals.length === 0) return null
+  const cancel = () => {
+    setEditing(false)
+    setDraft('')
+  }
+
+  if (editing) {
+    return (
+      <div className="flex-1 flex items-center gap-2 min-w-0">
+        <span className="text-[10px] text-amber-500/40 shrink-0 font-mono tracking-widest uppercase">
+          {now.getMonth() + 1}月
+        </span>
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel() }}
+          placeholder="今月の目標..."
+          className="flex-1 bg-transparent border-b border-amber-500/40 focus:border-amber-400 text-sm font-bold tracking-tight text-amber-200 outline-none py-0.5 min-w-0 placeholder:text-amber-500/20 placeholder:font-normal"
+        />
+        <button onClick={save} className="text-xs text-amber-400 hover:text-amber-300 shrink-0 transition-colors">✓</button>
+        <button onClick={cancel} className="text-xs text-[#5a5a6e] hover:text-[#8b8b9e] shrink-0 transition-colors">✕</button>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <button onClick={() => setOpen(o => !o)}
-          className="text-[#5a5a6e] hover:text-amber-400 transition-colors text-xs leading-none">
-          {open ? '▾' : '▸'}
-        </button>
-        <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">GOALS</h3>
-      </div>
-
-      {open && (
-        <div className="space-y-3">
-          {/* 今月 */}
-          {thisMonthGoals.length > 0 && (
-            <div>
-              <p className="text-[10px] text-[#5a5a6e] mb-1 pl-1">{monthLabel(thisYear, thisMonth)}</p>
-              <div className="space-y-1">
-                {thisMonthGoals.map(g => (
-                  <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#16161e] border border-[#2a2a3a]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60 shrink-0" />
-                    <span className="flex-1 text-xs text-[#e4e4ec] truncate">{g.title}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(g.status)}`}>
-                      {statusLabel(g.status)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 先月（薄め表示） */}
-          {lastMonthGoals.length > 0 && (
-            <div className="opacity-40">
-              <p className="text-[10px] text-[#5a5a6e] mb-1 pl-1">{monthLabel(lastMonthDate.getFullYear(), lastMonthDate.getMonth())}</p>
-              <div className="space-y-1">
-                {lastMonthGoals.map(g => (
-                  <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#16161e] border border-[#2a2a3a]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#5a5a6e] shrink-0" />
-                    <span className="flex-1 text-xs text-[#8b8b9e] truncate">{g.title}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(g.status)}`}>
-                      {statusLabel(g.status)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="flex-1 flex items-center gap-2 min-w-0 group">
+      <span className="text-[10px] text-amber-500/30 shrink-0 font-mono tracking-widest uppercase">
+        {now.getMonth() + 1}月
+      </span>
+      {content ? (
+        <span className="text-base font-bold tracking-tight text-amber-300/80 truncate min-w-0 select-none">
+          ✦ {content}
+        </span>
+      ) : (
+        <span className="text-sm text-[#3a3a4e] italic truncate select-none">
+          今月の目標を設定...
+        </span>
       )}
+      <button
+        onClick={startEdit}
+        className="opacity-30 group-hover:opacity-100 text-base text-amber-500/60 hover:text-amber-400 transition-opacity shrink-0 px-1"
+        title="今月の目標を編集"
+      >
+        ✎
+      </button>
     </div>
   )
 }

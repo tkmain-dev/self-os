@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { apiPost, apiDelete } from '../hooks/useApi'
 
 interface Habit {
@@ -63,8 +63,8 @@ export default function HabitTracker() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [logs, setLogs] = useState<HabitLog[]>([])
   const [name, setName] = useState('')
-  const [parentId, setParentId] = useState<number | ''>('')
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const [inlineAdd, setInlineAdd] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
 
   const days = getLast7Days()
@@ -86,10 +86,17 @@ export default function HabitTracker() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    const body: { name: string; parent_id?: number } = { name: name.trim() }
-    if (parentId !== '') body.parent_id = parentId as number
-    await apiPost('/api/habits', body)
+    await apiPost('/api/habits', { name: name.trim() })
     setName('')
+    fetchData()
+  }
+
+  const handleAddChild = async (parentId: number) => {
+    const childName = inlineAdd[parentId]?.trim()
+    if (!childName) return
+    await apiPost('/api/habits', { name: childName, parent_id: parentId })
+    setInlineAdd(prev => { const n = { ...prev }; delete n[parentId]; return n })
+    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
     fetchData()
   }
 
@@ -115,11 +122,15 @@ export default function HabitTracker() {
     })
   }
 
+  const openInlineAdd = (parentId: number) => {
+    setInlineAdd(prev => prev[parentId] !== undefined ? prev : { ...prev, [parentId]: '' })
+    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
+  }
+
   const isChecked = (habitId: number, date: string) =>
     logs.some(l => l.habit_id === habitId && l.date === date)
 
   const tree = buildHabitTree(habits)
-  const rootHabits = habits.filter(h => h.parent_id === null)
 
   const flatRows: { node: HabitNode; depth: number }[] = []
   const walk = (nodes: HabitNode[], depth: number) => {
@@ -141,14 +152,9 @@ export default function HabitTracker() {
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="習慣名..."
+          placeholder="新しい習慣..."
           className="flex-1 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] focus:outline-none focus:ring-2 focus:ring-amber-400/50 placeholder:text-[#3a3a4e]"
         />
-        <select value={parentId} onChange={e => setParentId(e.target.value === '' ? '' : Number(e.target.value))}
-          className="bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-2 py-2 text-sm text-[#8b8b9e] focus:outline-none focus:ring-2 focus:ring-amber-400/50">
-          <option value="">グループなし</option>
-          {rootHabits.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-        </select>
         <button type="submit" className="bg-amber-500 text-black px-4 py-2 rounded-lg hover:bg-amber-400 text-sm font-semibold transition-colors">追加</button>
       </form>
 
@@ -159,7 +165,7 @@ export default function HabitTracker() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a3a]">
-                <th className="text-left p-3 min-w-[120px] text-[#8b8b9e] text-sm font-medium">習慣</th>
+                <th className="text-left p-3 min-w-[150px] text-[#8b8b9e] text-sm font-medium">習慣</th>
                 {days.map(d => {
                   const info = shortDate(d)
                   return (
@@ -169,68 +175,99 @@ export default function HabitTracker() {
                     </th>
                   )
                 })}
-                <th className="w-12"></th>
               </tr>
             </thead>
             <tbody>
               {flatRows.map(({ node, depth }) => {
-                const isGroup = node.children.length > 0
+                const hasChildren = node.children.length > 0
                 const isCollapsed = collapsed.has(node.id)
+                const showingInlineAdd = inlineAdd[node.id] !== undefined
+                const isGroup = hasChildren || showingInlineAdd
                 return (
-                  <tr key={node.id} className={`border-b border-[#1f1f2e] last:border-0 ${isGroup ? 'bg-[#0e0e12]/60' : ''}`}>
-                    <td className="p-3 text-sm" style={{ paddingLeft: `${depth * 20 + 12}px` }}>
-                      <div className="flex items-center gap-1.5">
-                        {isGroup ? (
-                          <button onClick={() => toggleCollapse(node.id)}
-                            className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center">
-                            {isCollapsed ? '▸' : '▾'}
-                          </button>
-                        ) : (
-                          <span className="w-4 shrink-0" />
-                        )}
-                        <span className={isGroup ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
-                          {node.name}
-                        </span>
-                      </div>
-                    </td>
-                    {days.map(d => {
-                      const info = shortDate(d)
-                      if (isGroup) {
-                        const childIds = node.children.map(c => c.id)
-                        const doneCount = childIds.filter(cid => isChecked(cid, d)).length
+                  <React.Fragment key={node.id}>
+                    <tr className={`border-b border-[#1f1f2e] last:border-0 ${hasChildren ? 'bg-[#0e0e12]/60' : ''}`}>
+                      <td className="p-3 text-sm" style={{ paddingLeft: `${depth * 20 + 12}px` }}>
+                        <div className="flex items-center gap-1.5">
+                          {hasChildren ? (
+                            <button onClick={() => toggleCollapse(node.id)}
+                              className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center">
+                              {isCollapsed ? '▸' : '▾'}
+                            </button>
+                          ) : (
+                            <span className="w-4 shrink-0" />
+                          )}
+                          <span className={hasChildren ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
+                            {node.name}
+                          </span>
+                          <span className="flex items-center gap-1 ml-1">
+                            {!showingInlineAdd && (
+                              <button onClick={() => openInlineAdd(node.id)}
+                                title="子習慣を追加"
+                                className="text-[#3a3a4e] hover:text-amber-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
+                                +
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteHabit(node.id, isGroup)}
+                              className="text-[#5a5a6e] hover:text-red-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
+                              &times;
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                      {days.map(d => {
+                        const info = shortDate(d)
+                        if (hasChildren) {
+                          const childIds = node.children.map(c => c.id)
+                          const doneCount = childIds.filter(cid => isChecked(cid, d)).length
+                          return (
+                            <td key={d} className={`p-2 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
+                              {childIds.length > 0 && (
+                                <span className={`text-xs font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
+                                  {doneCount}/{childIds.length}
+                                </span>
+                              )}
+                            </td>
+                          )
+                        }
+                        const checked = isChecked(node.id, d)
                         return (
                           <td key={d} className={`p-2 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                            {childIds.length > 0 && (
-                              <span className={`text-xs font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
-                                {doneCount}/{childIds.length}
-                              </span>
-                            )}
+                            <button
+                              onClick={() => handleToggle(node.id, d)}
+                              className={`w-7 h-7 rounded border-2 transition-colors text-sm ${
+                                checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
+                              }`}
+                            >
+                              {checked ? '✓' : ''}
+                            </button>
                           </td>
                         )
-                      }
-                      const checked = isChecked(node.id, d)
-                      return (
-                        <td key={d} className={`p-2 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                          <button
-                            onClick={() => handleToggle(node.id, d)}
-                            className={`w-7 h-7 rounded border-2 transition-colors text-sm ${
-                              checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
-                            }`}
-                          >
-                            {checked ? '✓' : ''}
-                          </button>
+                      })}
+                    </tr>
+                    {showingInlineAdd && (
+                      <tr className="border-b border-[#1f1f2e] bg-[#0e0e12]/40">
+                        <td colSpan={days.length + 1} style={{ paddingLeft: `${(depth + 1) * 20 + 12}px` }} className="py-2 pr-4">
+                          <form onSubmit={e => { e.preventDefault(); handleAddChild(node.id) }} className="flex gap-1 items-center">
+                            <span className="text-[#3a3a4e] text-sm mr-0.5">└</span>
+                            <input
+                              autoFocus
+                              value={inlineAdd[node.id] ?? ''}
+                              onChange={e => setInlineAdd(prev => ({ ...prev, [node.id]: e.target.value }))}
+                              placeholder="子習慣名..."
+                              className="flex-1 bg-transparent border-b border-[#2a2a3a] focus:border-amber-500/50 text-sm text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none py-0.5"
+                              onKeyDown={e => {
+                                if (e.key === 'Escape') setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })
+                              }}
+                            />
+                            <button type="submit" className="text-sm text-amber-500 hover:text-amber-400 px-2">追加</button>
+                            <button type="button"
+                              onClick={() => setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })}
+                              className="text-xs text-[#5a5a6e] hover:text-[#8b8b9e]">キャンセル</button>
+                          </form>
                         </td>
-                      )
-                    })}
-                    <td className="p-2">
-                      <button
-                        onClick={() => handleDeleteHabit(node.id, isGroup)}
-                        className="text-[#5a5a6e] hover:text-red-400 text-sm transition-colors"
-                      >
-                        &times;
-                      </button>
-                    </td>
-                  </tr>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )
               })}
             </tbody>
