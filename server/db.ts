@@ -65,6 +65,30 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (parent_id) REFERENCES goals(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS feature_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK(status IN ('pending', 'in_progress', 'done', 'rejected')),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  CREATE TABLE IF NOT EXISTS wish_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_type TEXT NOT NULL DEFAULT 'wish'
+      CHECK(list_type IN ('wish', 'bucket')),
+    title TEXT NOT NULL,
+    price INTEGER,
+    url TEXT,
+    deadline TEXT,
+    memo TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 export default db;

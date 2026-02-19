@@ -5,6 +5,8 @@ import diaryRouter from './routes/diary';
 import scheduleRouter from './routes/schedule';
 import habitsRouter from './routes/habits';
 import goalsRouter from './routes/goals';
+import featureRequestsRouter from './routes/featureRequests';
+import wishItemsRouter from './routes/wishItems';
 
 const app = express();
 const PORT = 3001;
@@ -17,6 +19,8 @@ app.use('/api/diary', diaryRouter);
 app.use('/api/schedules', scheduleRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/goals', goalsRouter);
+app.use('/api/feature-requests', featureRequestsRouter);
+app.use('/api/wish-items', wishItemsRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

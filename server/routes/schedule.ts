@@ -4,9 +4,12 @@ import db from '../db';
 const router = Router();
 
 router.get('/', (req, res) => {
-  const { date } = req.query;
+  const { date, from, to } = req.query;
   if (date) {
     const schedules = db.prepare('SELECT * FROM schedules WHERE date = ? ORDER BY start_time ASC').all(date);
+    res.json(schedules);
+  } else if (from && to) {
+    const schedules = db.prepare('SELECT * FROM schedules WHERE date >= ? AND date <= ? ORDER BY date ASC, start_time ASC').all(from, to);
     res.json(schedules);
   } else {
     const schedules = db.prepare('SELECT * FROM schedules ORDER BY date ASC, start_time ASC').all();

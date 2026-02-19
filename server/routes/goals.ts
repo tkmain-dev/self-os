@@ -19,9 +19,15 @@ function syncParentDates(childParentId: unknown) {
 }
 
 // Get all goals (flat list, frontend builds tree)
-router.get('/', (_req, res) => {
-  const goals = db.prepare('SELECT * FROM goals ORDER BY sort_order ASC, created_at ASC').all();
-  res.json(goals);
+router.get('/', (req, res) => {
+  const { from, to } = req.query;
+  if (from && to) {
+    const goals = db.prepare('SELECT * FROM goals WHERE start_date <= ? AND end_date >= ? ORDER BY sort_order ASC, created_at ASC').all(to, from);
+    res.json(goals);
+  } else {
+    const goals = db.prepare('SELECT * FROM goals ORDER BY sort_order ASC, created_at ASC').all();
+    res.json(goals);
+  }
 });
 
 // Create goal

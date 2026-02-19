@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
+import AdminModal, { GearButton } from './admin/AdminModal'
 
 const today = () => {
   const d = new Date()
@@ -9,10 +10,14 @@ const today = () => {
 
 const nav = [
   { to: '/daily', label: 'デイリー', icon: '▦' },
+  { to: '/calendar', label: 'カレンダー', icon: '▨' },
   { to: '/goals', label: '目標管理', icon: '◫' },
+  { to: '/wishlist', label: 'ウィッシュ', icon: '✦' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
+  const [adminOpen, setAdminOpen] = useState(false)
+
   return (
     <div className="flex h-screen">
       <aside className="sidebar w-52 p-5 flex flex-col shadow-2xl">
@@ -31,13 +36,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto pt-4 border-t border-[#2a2a3a]">
-          <p className="text-xs text-[#5a5a6e] text-center">My Techo</p>
+        <div className="mt-auto pt-4 border-t border-[#2a2a3a] flex items-center justify-between">
+          <p className="text-xs text-[#5a5a6e]">My Techo</p>
+          <GearButton onClick={() => setAdminOpen(true)} />
         </div>
       </aside>
-      <main className="page-area flex-1 overflow-auto p-8">
+      <main className="page-area flex-1 overflow-auto p-4 md:p-6 lg:p-8">
         {children}
       </main>
+      <AdminModal open={adminOpen} onClose={() => setAdminOpen(false)} />
     </div>
   )
 }

@@ -134,6 +134,18 @@ body {
 .bn-editor {
   background: transparent !important;
   color: var(--text-primary);
+  font-size: 0.85rem !important;
+  line-height: 1.1 !important;
+}
+
+.bn-editor .bn-block-content,
+.bn-editor .bn-inline-content,
+.bn-editor [class*="blockContent"],
+.bn-editor [class*="inlineContent"],
+.bn-editor p,
+.bn-editor div {
+  font-size: 0.85rem !important;
+  line-height: 1.1 !important;
 }
 
 .bn-block-content {

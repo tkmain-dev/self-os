@@ -107,15 +107,15 @@ export default function DailyPage() {
         </button>
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex gap-6 items-start">
+      {/* Two-column layout – stacks on narrow, side-by-side on wide */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left: Timeline */}
-        <div className="w-80 shrink-0">
+        <div className="w-full lg:w-80 shrink-0">
           <ScheduleTimeline date={date} isToday={isToday} />
         </div>
 
         {/* Right: Diary + Habits */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 w-full space-y-6">
           <Diary date={date} />
           <HabitSection />
         </div>

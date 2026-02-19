@@ -144,14 +144,14 @@ export default function Diary({ date }: { date: string }) {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <h2 className="techo-heading text-2xl mb-4">日記</h2>
 
       {loading ? (
         <p className="text-[#5a5a6e]">読み込み中...</p>
       ) : (
         <>
-          <div className="bg-[#16161e] border border-[#2a2a3a] rounded-xl p-4 min-h-[500px] shadow-lg">
+          <div className="bg-[#16161e] border border-[#2a2a3a] rounded-xl p-4 min-h-[120px] shadow-lg">
             <BlockNoteView
               editor={editor}
               theme="dark"
