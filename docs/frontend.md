@@ -1,325 +1,153 @@
 # フロントエンド構成
 
-## コンポーネント階層図
+## ルーティング
 
-```mermaid
-graph TB
-    subgraph "App.tsx"
-        App[App Component]
-        Router[React Router]
-    end
+React Router v7 によるクライアントサイドルーティング。`Layout` コンポーネントが全ページを包む。
 
-    subgraph "Layout.tsx"
-        Layout[Layout Component]
-        Sidebar[サイドバー]
-        Main[メインエリア]
-    end
+| パス | コンポーネント | 説明 |
+|------|---------------|------|
+| `/` | → `/daily` リダイレクト | |
+| `/daily` | `DailyPage` | デイリーページ |
+| `/calendar` | `CalendarPage` | カレンダー |
+| `/goals` | `GoalGantt` | 目標管理 |
+| `/wishlist` | `WishListPage` | ウィッシュリスト |
 
-    subgraph "DailyPage.tsx"
-        DailyPage[DailyPage Component]
-        ScheduleTimeline[ScheduleTimeline]
-        DiarySection[DiarySection]
-        HabitSection[HabitSection]
-    end
-
-    subgraph "GoalGantt.tsx"
-        GoalGantt[GoalGantt Component]
-        GoalForm[目標追加/編集フォーム]
-        GanttChart[ガントチャート表示]
-    end
-
-    subgraph "Hooks"
-        useApi[useApi Hook]
-        apiPost[apiPost]
-        apiPut[apiPut]
-        apiPatch[apiPatch]
-        apiDelete[apiDelete]
-    end
-
-    App --> Router
-    Router --> Layout
-    Layout --> Sidebar
-    Layout --> Main
-    Router --> DailyPage
-    Router --> GoalGantt
-    DailyPage --> ScheduleTimeline
-    DailyPage --> DiarySection
-    DailyPage --> HabitSection
-    GoalGantt --> GoalForm
-    GoalGantt --> GanttChart
-    DailyPage --> useApi
-    GoalGantt --> useApi
-    ScheduleTimeline --> apiPost
-    ScheduleTimeline --> apiDelete
-    DiarySection --> apiPut
-    HabitSection --> apiPost
-    HabitSection --> apiDelete
-    GoalGantt --> apiPost
-    GoalGantt --> apiPatch
-    GoalGantt --> apiDelete
-
-    style App fill:#e1f5ff
-    style Layout fill:#fff4e1
-    style DailyPage fill:#e8f5e9
-    style GoalGantt fill:#e8f5e9
-    style useApi fill:#f3e5f5
-```
-
-## ルーティング構成
-
-```mermaid
-stateDiagram-v2
-    [*] --> Root: アクセス
-    Root --> Daily: /daily (デフォルト)
-    Root --> Goals: /goals
-    
-    state Daily {
-        [*] --> ScheduleTimeline
-        [*] --> DiarySection
-        [*] --> HabitSection
-    }
-    
-    state Goals {
-        [*] --> GoalList
-        [*] --> GoalForm: 追加/編集時
-    }
-    
-    Daily --> Goals: ナビゲーション
-    Goals --> Daily: ナビゲーション
-```
-
-## コンポーネント詳細
-
-### App.tsx
-
-**役割**: アプリケーションのルートコンポーネント、ルーティング定義
-
-```mermaid
-classDiagram
-    class App {
-        +Routes
-        +Route path="/"
-        +Route path="/daily"
-        +Route path="/goals"
-    }
-    
-    App --> Layout
-    App --> DailyPage
-    App --> GoalGantt
-```
+## コンポーネント一覧
 
 ### Layout.tsx
 
-**役割**: 共通レイアウト（サイドバー + メインエリア）
+共通レイアウト。左サイドバー（ナビゲーション4項目 + 歯車ボタン）+ メインエリア。
 
-```mermaid
-classDiagram
-    class Layout {
-        -nav: Array~NavItem~
-        +today(): string
-        +render()
-    }
-    
-    class NavItem {
-        +to: string
-        +label: string
-        +icon: string
-    }
-    
-    Layout --> NavItem
-```
-
-**機能**:
-- サイドバーにナビゲーション表示
-- 今日の日付表示
-- アクティブなページのハイライト
+- サイドバーに今日の日付を表示
+- アクティブなページをハイライト
+- 歯車ボタンで `AdminModal` を開く
 
 ### DailyPage.tsx
 
-**役割**: デイリーページのメインコンポーネント
+1日の予定・習慣・日記を一画面で表示するメインページ。
 
-```mermaid
-classDiagram
-    class DailyPage {
-        -date: string
-        -isToday: boolean
-        +changeDate(offset: number)
-        +render()
-    }
-    
-    class ScheduleTimeline {
-        -schedules: ScheduleItem[]
-        -showForm: boolean
-        +fetchSchedules()
-        +handleAdd()
-        +handleDelete(id)
-        +getEventStyle(item)
-    }
-    
-    class DiarySection {
-        -content: string
-        -saved: boolean
-        +handleSave()
-    }
-    
-    class HabitSection {
-        -habits: Habit[]
-        -logs: HabitLog[]
-        +fetchData()
-        +handleToggle(habitId, date)
-        +handleAdd()
-        +handleDeleteHabit(id)
-    }
-    
-    DailyPage --> ScheduleTimeline
-    DailyPage --> DiarySection
-    DailyPage --> HabitSection
-```
+- **スケジュールタイムライン**: 6:00〜24:00 の時間軸グリッド。現在時刻インジケーター付き
+- **習慣トラッカー**: 直近7日間のチェックマトリクス（`HabitTracker` をインライン統合）
+- **日記セクション**: `Diary` コンポーネントを埋め込み
+- 日付ナビゲーション（前日・翌日・今日ボタン）
 
-**状態管理**:
-- 選択中の日付（`date`）
-- 各セクションのデータ（スケジュール、日記、習慣）
+### Diary.tsx
+
+BlockNote リッチテキストエディタによる日記コンポーネント。
+
+- BlockNote エディタ（ダークテーマ対応）
+- 5秒デバウンスの自動保存
+- JSON / Markdown 両形式の後方互換パース
+- 手動保存ボタン + 保存ステータス表示
 
 ### GoalGantt.tsx
 
-**役割**: 目標管理とガントチャート表示
+WBS ベースのガントチャートで目標を階層管理する。最も複雑なコンポーネント。
 
-```mermaid
-classDiagram
-    class GoalGantt {
-        -goals: Goal[]
-        -viewRange: ViewRange
-        -offset: number
-        -showForm: boolean
-        -editId: number | null
-        +handleSubmit()
-        +handleDelete(id)
-        +handleProgress(goal, progress)
-        +openEdit(goal)
-    }
-    
-    class Goal {
-        +id: number
-        +title: string
-        +category: string
-        +start_date: string
-        +end_date: string
-        +progress: number
-        +color: string
-        +memo: string
-    }
-    
-    GoalGantt --> Goal
-```
+- **階層構造**: Epic > Story > Task > Subtask の4階層ツリー
+- **ガントチャート**: 1ヶ月 / 3ヶ月 / 6ヶ月 / 1年の表示レンジ切替
+- **ドラッグ操作**:
+  - バーのリサイズ（左端・右端）で期間変更
+  - バーの移動で期間シフト
+  - 行のドラッグで並替・親子関係変更
+- **インライン編集**: タイトル直接編集、ステータスドロップダウン
+- **進捗管理**: 子目標からの自動計算
+- **折りたたみ**: ツリーノードの展開・折りたたみ
 
-**機能**:
-- 1ヶ月/3ヶ月/6ヶ月/1年の表示範囲切り替え
-- 月単位のスクロール
-- カテゴリ別のグループ化
-- 進捗率の更新（+/-10%）
-- 目標の追加・編集・削除
+### CalendarPage.tsx（+ calendar/ 配下）
+
+月・週・日の3ビューカレンダー。スケジュールと目標を統合表示。
+
+| ファイル | 役割 |
+|---------|------|
+| `CalendarPage.tsx` | メイン。データ取得、ビュー切替、モーダル管理 |
+| `CalendarHeader.tsx` | ヘッダー（ビュー切替ボタン、期間ナビゲーション、今日ボタン） |
+| `CalendarMonthView.tsx` | 月ビュー（日セルグリッド + バンド表示） |
+| `CalendarWeekView.tsx` | 週ビュー（時間軸グリッド + 目標バンド） |
+| `CalendarDayView.tsx` | 日ビュー（詳細タイムライン + 目標バンド） |
+| `CalendarDayCell.tsx` | 月ビュー用の各日セル |
+| `CalendarTimeGrid.tsx` | 時間軸グリッド（週・日ビュー共通） |
+| `CalendarEventItem.tsx` | スケジュールイベント表示 |
+| `CalendarGoalItem.tsx` | 目標バンド表示 |
+| `CalendarFormModal.tsx` | スケジュール作成・編集モーダル |
+| `calendarTypes.ts` | 型定義（ScheduleItem, GoalItem, CalendarEvent, BandSegment） |
+| `calendarUtils.ts` | ユーティリティ関数 |
+
+### WishListPage.tsx
+
+「買いたいもの」と「やりたいこと」の2タブ管理ページ。
+
+- **タブ切替**: wish（amber テーマ）/ bucket（teal-violet テーマ）
+- **カード UI**: タイトル、価格（wish のみ）、URL、期限、メモ
+- **ドラッグ並替**: HTML5 Drag and Drop で優先順位変更
+- **チケット化モーダル**: bucket アイテムから目標管理の Story を作成（Epic 選択 or 新規作成）
+- **日記パネル**: 編集中に右側に日記を表示
+- **統計表示**: 完了数、合計金額（wish）
+
+### AdminModal.tsx
+
+管理モーダル。サイドバーの歯車ボタンから開く。
+
+- **3パネル構成**: 左（完了済み一覧）| 中央（アクティブ一覧）| 右（日記パネル）
+- **Feature Request CRUD**: 作成・編集・削除・ステータス変更
+- **ステータスバッジ**: pending=グレー, in_progress=amber, done=green, rejected=red
+- **ドラッグ並替**: 優先順位変更
+- **完了済み分離**: done / rejected の項目は左パネルに分離表示
+- `GearButton` コンポーネントもエクスポート（Layout で使用）
+
+### その他のコンポーネント
+
+| ファイル | 役割 |
+|---------|------|
+| `HabitTracker.tsx` | スタンドアロン習慣トラッカー（7日間チェックマトリクス） |
+| `Schedule.tsx` | スタンドアロンスケジュール表示（タイムライン） |
+| `TodoList.tsx` | ToDo リスト（追加・完了トグル・削除） |
 
 ## カスタムフック
 
 ### useApi.ts
 
-**役割**: API通信の共通ロジック
+API 通信の共通ロジック。
 
-```mermaid
-classDiagram
-    class useApi {
-        -data: T | null
-        -loading: boolean
-        +refetch(): void
-    }
-    
-    class apiPost {
-        +apiPost(url, body): Promise~T~
-    }
-    
-    class apiPut {
-        +apiPut(url, body): Promise~T~
-    }
-    
-    class apiPatch {
-        +apiPatch(url, body): Promise~T~
-    }
-    
-    class apiDelete {
-        +apiDelete(url): Promise~void~
-    }
-    
-    useApi --> apiPost
-    useApi --> apiPut
-    useApi --> apiPatch
-    useApi --> apiDelete
-```
-
-**使用例**:
 ```typescript
-const { data: goals, loading, refetch } = useApi<Goal[]>('/api/goals');
-```
+// データ取得
+const { data, loading, refetch } = useApi<Goal[]>('/api/goals');
 
-## データフロー
-
-### スケジュール追加のフロー
-
-```mermaid
-sequenceDiagram
-    participant User as ユーザー
-    participant UI as ScheduleTimeline
-    participant Hook as useApi
-    participant Server as Express API
-
-    User->>UI: フォーム入力・送信
-    UI->>Hook: apiPost('/api/schedules', {...})
-    Hook->>Server: POST /api/schedules
-    Server-->>Hook: レスポンス
-    Hook-->>UI: 完了
-    UI->>UI: fetchSchedules() 実行
-    UI->>Hook: GET /api/schedules?date=...
-    Hook->>Server: GET /api/schedules
-    Server-->>Hook: スケジュール一覧
-    Hook-->>UI: データ更新
-    UI-->>User: UI更新（新規スケジュール表示）
-```
-
-### 日記保存のフロー
-
-```mermaid
-sequenceDiagram
-    participant User as ユーザー
-    participant UI as DiarySection
-    participant Hook as useApi
-    participant Server as Express API
-
-    User->>UI: テキスト入力
-    User->>UI: 保存ボタンクリック
-    UI->>Hook: apiPut('/api/diary/2024-01-01', {content})
-    Hook->>Server: PUT /api/diary/2024-01-01
-    Server-->>Hook: 保存されたエントリ
-    Hook-->>UI: 完了
-    UI->>UI: setSaved(true)
-    UI-->>User: "保存しました" 表示
+// 書き込み操作
+await apiPost('/api/goals', { title: '...', start_date: '...' });
+await apiPatch('/api/goals/1', { status: 'done' });
+await apiPut('/api/diary/2024-01-01', { content: '...' });
+await apiDelete('/api/goals/1');
 ```
 
 ## スタイリング
 
-### デザインコンセプト
+### デザインシステム
 
-```mermaid
-graph LR
-    A[手帳風デザイン] --> B[サイドバー<br/>革調背景]
-    A --> C[メインエリア<br/>紙のような背景]
-    A --> D[罫線パターン]
-    A --> E[アンバー系<br/>アクセントカラー]
-```
+`src/index.css` で CSS カスタムプロパティによるダークモダンテーマを定義。
 
-**CSS構成**:
-- `index.css`: グローバルスタイル、カスタムクラス
-- Tailwind CSS: ユーティリティクラス
-- カスタムクラス:
-  - `.sidebar`: サイドバースタイル
-  - `.sidebar-link`: ナビゲーションリンク
-  - `.page-area`: メインエリア（罫線付き背景）
-  - `.techo-heading`: 見出しスタイル
+- **背景**: `#0e0e12`（メイン）/ `#16161e`（カード）
+- **テキスト**: `#e4e4ec`（主）/ `#8b8b9e`（副）/ `#5a5a6e`（補助）
+- **アクセント**: amber-500
+- **ボーダー**: `#2a2a3a`
+- **シャドウ**: CSS カスタムプロパティで定義
+
+### カスタムクラス
+
+| クラス | 用途 |
+|--------|------|
+| `.sidebar` | サイドバースタイル |
+| `.sidebar-link` / `.sidebar-link.active` | ナビゲーションリンク |
+| `.page-area` | メインコンテンツエリア |
+| `.techo-heading` | アンダーライン付き見出し |
+
+### タブ別テーマ（WishListPage）
+
+ウィッシュリストでは `theme` オブジェクトでタブごとに異なるスタイルを適用:
+
+| プロパティ | Wish (amber) | Bucket (teal-violet) |
+|-----------|-------------|---------------------|
+| カード背景 | `bg-[#16161e]` | グラデーション |
+| 角丸 | `rounded-xl` | `rounded-2xl` |
+| 左アクセント | amber | teal |
+| ヘッダー | amber グラデーション | teal-violet グラデーション |

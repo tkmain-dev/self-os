@@ -1,5 +1,13 @@
 # データベース設計
 
+## 概要
+
+SQLite をファイルベース（`data/techo.db`）で使用。`better-sqlite3` による同期的操作。
+起動時にテーブルが存在しなければ自動作成される。
+
+- **WAL モード**: 書き込み性能向上
+- **外部キー制約**: 有効化（データ整合性保証）
+
 ## ER図
 
 ```mermaid
@@ -42,7 +50,11 @@ erDiagram
 
     GOALS {
         int id PK
+        int parent_id FK
         string title
+        string issue_type
+        string status
+        string priority
         string category
         string start_date
         string end_date
@@ -53,7 +65,30 @@ erDiagram
         string created_at
     }
 
+    FEATURE_REQUESTS {
+        int id PK
+        string title
+        string description
+        string status
+        int sort_order
+        string created_at
+    }
+
+    WISH_ITEMS {
+        int id PK
+        string list_type
+        string title
+        int price
+        string url
+        string deadline
+        string memo
+        int done
+        int sort_order
+        string created_at
+    }
+
     HABITS ||--o{ HABIT_LOGS : "has"
+    GOALS ||--o{ GOALS : "parent_id"
 ```
 
 ## テーブル定義
@@ -65,21 +100,19 @@ erDiagram
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | タスクID |
 | title | TEXT | NOT NULL | タスクタイトル |
 | done | INTEGER | NOT NULL, DEFAULT 0 | 完了フラグ（0:未完了, 1:完了） |
-| due_date | TEXT | NULL | 期限日（YYYY-MM-DD形式） |
+| due_date | TEXT | NULL | 期限日（YYYY-MM-DD） |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
-
-**用途**: タスク管理機能（現在はUIに未実装だが、データベースとAPIは準備済み）
 
 ### diary（日記）
 
 | カラム名 | 型 | 制約 | 説明 |
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 日記ID |
-| date | TEXT | NOT NULL, UNIQUE | 日付（YYYY-MM-DD形式） |
-| content | TEXT | NOT NULL, DEFAULT '' | 日記の内容 |
+| date | TEXT | NOT NULL, UNIQUE | 日付（YYYY-MM-DD） |
+| content | TEXT | NOT NULL, DEFAULT '' | 日記の内容（BlockNote JSON） |
 | updated_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 更新日時 |
 
-**用途**: 日付ごとの日記を保存。1日1エントリ。
+1日1エントリ。BlockNote リッチテキストエディタの JSON 形式で保存。
 
 ### schedules（スケジュール）
 
@@ -87,12 +120,12 @@ erDiagram
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | スケジュールID |
 | title | TEXT | NOT NULL | 予定タイトル |
-| date | TEXT | NOT NULL | 日付（YYYY-MM-DD形式） |
-| start_time | TEXT | NULL | 開始時刻（HH:MM形式） |
-| end_time | TEXT | NULL | 終了時刻（HH:MM形式） |
+| date | TEXT | NOT NULL | 日付（YYYY-MM-DD） |
+| start_time | TEXT | NULL | 開始時刻（HH:MM） |
+| end_time | TEXT | NULL | 終了時刻（HH:MM） |
 | memo | TEXT | NULL | メモ |
 
-**用途**: 日々のスケジュール管理。時間指定あり/なしの両方に対応。
+時間指定あり / なしの両方に対応。
 
 ### habits（習慣）
 
@@ -102,102 +135,66 @@ erDiagram
 | name | TEXT | NOT NULL | 習慣名 |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
-**用途**: 習慣の定義を保存。
-
 ### habit_logs（習慣ログ）
 
 | カラム名 | 型 | 制約 | 説明 |
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | ログID |
-| habit_id | INTEGER | NOT NULL, FK → habits(id) | 習慣ID |
-| date | TEXT | NOT NULL | 実行日（YYYY-MM-DD形式） |
-| UNIQUE(habit_id, date) | | | 1習慣1日1回のみ記録可能 |
+| habit_id | INTEGER | NOT NULL, FK → habits(id) ON DELETE CASCADE | 習慣ID |
+| date | TEXT | NOT NULL | 実行日（YYYY-MM-DD） |
 
-**用途**: 習慣の実行記録。同じ習慣を同じ日に複数回記録できない。
-
-**外部キー制約**: `ON DELETE CASCADE` - 習慣が削除されると関連ログも自動削除
+- UNIQUE(habit_id, date): 1習慣1日1回のみ記録可能
+- 習慣が削除されると関連ログも自動削除（CASCADE）
 
 ### goals（目標）
 
 | カラム名 | 型 | 制約 | 説明 |
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 目標ID |
+| parent_id | INTEGER | NULL, FK → goals(id) ON DELETE CASCADE | 親目標ID |
 | title | TEXT | NOT NULL | 目標タイトル |
+| issue_type | TEXT | NOT NULL, DEFAULT 'task' | 種別（epic/story/task/subtask） |
+| status | TEXT | NOT NULL, DEFAULT 'todo' | ステータス（todo/in_progress/done） |
+| priority | TEXT | NOT NULL, DEFAULT 'medium' | 優先度（low/medium/high） |
 | category | TEXT | NOT NULL, DEFAULT '' | カテゴリ |
-| start_date | TEXT | NOT NULL | 開始日（YYYY-MM-DD形式） |
-| end_date | TEXT | NOT NULL | 終了日（YYYY-MM-DD形式） |
+| start_date | TEXT | NOT NULL | 開始日（YYYY-MM-DD） |
+| end_date | TEXT | NOT NULL | 終了日（YYYY-MM-DD） |
 | progress | INTEGER | NOT NULL, DEFAULT 0 | 進捗率（0-100） |
 | color | TEXT | NOT NULL, DEFAULT 'amber' | 表示色 |
 | memo | TEXT | NULL | メモ |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
-**用途**: 長期目標の管理。ガントチャート表示用。
+- **階層構造**: `parent_id` による自己参照で Epic > Story > Task > Subtask の4階層を表現
+- **期間伝播**: 子の期間変更時、`syncParentDates` により親の期間が自動調整される
+- **カスケード削除**: 親目標の削除時に子目標も自動削除
 
-## データベース初期化
+### feature_requests（Feature Request）
 
-データベースは `server/db.ts` で自動初期化されます：
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | リクエストID |
+| title | TEXT | NOT NULL | 機能名 |
+| description | TEXT | NOT NULL, DEFAULT '' | 詳細仕様 |
+| status | TEXT | NOT NULL, DEFAULT 'pending' | ステータス |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順（優先順位） |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
-```mermaid
-sequenceDiagram
-    participant Server as Express Server
-    participant DB as SQLite Database
+- **ステータス**: `pending` / `in_progress` / `done` / `rejected`（CHECK 制約）
 
-    Server->>DB: 接続 (better-sqlite3)
-    Server->>DB: PRAGMA journal_mode = WAL
-    Server->>DB: PRAGMA foreign_keys = ON
-    Server->>DB: CREATE TABLE IF NOT EXISTS ...
-    Note over DB: テーブルが存在しない場合のみ作成
-    DB-->>Server: 初期化完了
-```
+### wish_items（ウィッシュアイテム）
 
-**設定**:
-- **WALモード**: 書き込み性能向上
-- **外部キー制約**: 有効化（データ整合性保証）
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | アイテムID |
+| list_type | TEXT | NOT NULL, DEFAULT 'wish' | リスト種別 |
+| title | TEXT | NOT NULL | タイトル |
+| price | INTEGER | NULL | 価格（wish のみ） |
+| url | TEXT | NULL | URL（商品ページ / 参考ページ） |
+| deadline | TEXT | NULL | 期限（YYYY-MM-DD） |
+| memo | TEXT | NULL | メモ |
+| done | INTEGER | NOT NULL, DEFAULT 0 | 完了フラグ |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
-## データフロー例
-
-### スケジュール追加の例
-
-```mermaid
-sequenceDiagram
-    participant UI as DailyPage
-    participant API as useApi Hook
-    participant Server as Express Server
-    participant DB as SQLite
-
-    UI->>API: apiPost('/api/schedules', {...})
-    API->>Server: POST /api/schedules
-    Server->>DB: INSERT INTO schedules
-    DB-->>Server: lastInsertRowid
-    Server->>DB: SELECT * WHERE id = ?
-    DB-->>Server: 新規スケジュールデータ
-    Server-->>API: JSON レスポンス
-    API-->>UI: データ更新完了
-    UI->>UI: fetchSchedules() 再実行
-```
-
-### 習慣ログのトグル例
-
-```mermaid
-sequenceDiagram
-    participant UI as HabitSection
-    participant API as useApi Hook
-    participant Server as Express Server
-    participant DB as SQLite
-
-    UI->>API: apiPost('/api/habits/1/logs', {date})
-    API->>Server: POST /api/habits/1/logs
-    Server->>DB: INSERT INTO habit_logs
-    alt 既に存在する場合
-        DB-->>Server: UNIQUE制約エラー
-        Server->>DB: DELETE FROM habit_logs
-        DB-->>Server: 削除成功
-        Server-->>API: {deleted: true}
-    else 新規追加
-        DB-->>Server: 挿入成功
-        Server-->>API: {habit_id, date}
-    end
-    API-->>UI: レスポンス
-    UI->>UI: fetchData() 再実行
-```
+- **リスト種別**: `wish`（買いたいもの）/ `bucket`（やりたいこと）（CHECK 制約）

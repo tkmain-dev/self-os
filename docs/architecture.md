@@ -2,140 +2,172 @@
 
 ## システム概要
 
-「手帳（Techo）」は、個人の日々のスケジュール、習慣、日記、目標を管理するためのデジタル手帳アプリケーションです。
+「手帳（Techo）」は、個人の日々のスケジュール、習慣、日記、目標、ウィッシュリストを管理するためのデジタル手帳アプリケーションです。
 
 ## システム構成図
 
-```mermaid
-graph TB
-    subgraph "クライアント層"
-        Browser[Webブラウザ]
-        React[React 19 + TypeScript]
-        Router[React Router]
-        Components[UIコンポーネント]
-    end
-
-    subgraph "開発環境"
-        Vite[Vite Dev Server<br/>ポート: 5173]
-        Proxy[API Proxy<br/>/api → :3001]
-    end
-
-    subgraph "サーバー層"
-        Express[Express.js Server<br/>ポート: 3001]
-        Routes[API Routes]
-        CORS[CORS Middleware]
-    end
-
-    subgraph "データ層"
-        SQLite[(SQLite Database<br/>techo.db)]
-        Tables[テーブル群]
-    end
-
-    Browser --> React
-    React --> Router
-    Router --> Components
-    Components --> Vite
-    Vite --> Proxy
-    Proxy --> Express
-    Express --> CORS
-    CORS --> Routes
-    Routes --> SQLite
-    SQLite --> Tables
-
-    style Browser fill:#e1f5ff
-    style React fill:#e1f5ff
-    style Express fill:#fff4e1
-    style SQLite fill:#e8f5e9
 ```
+┌─────────────────┐      proxy /api      ┌──────────────────┐
+│   Vite (5173)   │ ──────────────────▶  │  Express (3001)  │
+│   React SPA     │                      │  REST API        │
+│   Tailwind CSS  │                      │  better-sqlite3  │
+└─────────────────┘                      └──────┬───────────┘
+                                                │
+                                         ┌──────▼───────────┐
+                                         │  SQLite (WAL)    │
+                                         │  data/techo.db   │
+                                         └──────────────────┘
+```
+
+- **フロントエンド**: Vite 7 で React 19 + TypeScript をビルド・配信（ポート 5173）
+- **バックエンド**: Express 5 で REST API を提供（ポート 3001）
+- **DB**: SQLite をファイルベースで利用。WAL モードで高速読み書き
+- **プロキシ**: 開発時は Vite の proxy 設定で `/api` を Express へ転送
 
 ## 技術スタック
 
 ### フロントエンド
-- **React 19.2.0** - UIフレームワーク
-- **TypeScript 5.9.3** - 型安全性
-- **Vite 7.3.1** - ビルドツール・開発サーバー
-- **React Router 7.13.0** - ルーティング
-- **Tailwind CSS 4.1.18** - スタイリング
+- **React 19** — UI フレームワーク
+- **TypeScript 5.9** — 型安全性
+- **Vite 7** — ビルドツール・開発サーバー（HMR 対応）
+- **React Router v7** — クライアントサイドルーティング
+- **Tailwind CSS 4** — ユーティリティファーストスタイリング
+- **BlockNote** — Notion 風リッチテキストエディタ（日記機能）
+- **Mantine** — BlockNote 用 UI コンポーネント
 
 ### バックエンド
-- **Express.js 5.2.1** - Webサーバー
-- **TypeScript 5.9.3** - 型安全性
-- **better-sqlite3 12.6.2** - SQLiteデータベースドライバ
-- **CORS 2.8.6** - クロスオリジンリソース共有
+- **Express 5** — Web サーバー
+- **TypeScript** — 型安全性（tsx で直接実行）
+- **better-sqlite3** — 同期的 SQLite ドライバ
+- **cors** — クロスオリジンリソース共有
 
 ### データベース
-- **SQLite** - リレーショナルデータベース（ファイルベース）
+- **SQLite** — リレーショナルデータベース（ファイルベース）
+- **WAL モード** — 書き込み性能向上
+- **外部キー制約** — 有効化（データ整合性保証）
+
+## 開発サーバー
+
+`npm run dev` で `concurrently` により以下が同時起動する:
+
+1. `vite` — フロントエンド開発サーバー（HMR 対応）
+2. `tsx server/index.ts` — バックエンドサーバー（TypeScript を直接実行）
 
 ## ディレクトリ構造
 
 ```
 techo-app/
-├── src/                    # フロントエンドソースコード
-│   ├── components/         # Reactコンポーネント
-│   ├── hooks/              # カスタムフック
-│   ├── App.tsx             # メインアプリケーション
-│   └── main.tsx            # エントリーポイント
-├── server/                 # バックエンドソースコード
-│   ├── routes/             # APIルート定義
-│   ├── db.ts               # データベース接続・初期化
-│   └── index.ts            # サーバーエントリーポイント
-├── data/                   # データベースファイル
-│   └── techo.db            # SQLiteデータベース
-├── public/                 # 静的ファイル
-├── dist/                   # ビルド成果物
-└── docs/                   # ドキュメント
+├── server/                   # バックエンド
+│   ├── index.ts              # Express サーバー (port 3001)
+│   ├── db.ts                 # SQLite 接続 & スキーマ定義
+│   └── routes/               # API ルートハンドラ
+│       ├── todos.ts          # ToDo CRUD
+│       ├── diary.ts          # 日記 CRUD
+│       ├── schedule.ts       # スケジュール CRUD
+│       ├── habits.ts         # 習慣 + ログ CRUD
+│       ├── goals.ts          # 目標 CRUD + 並替 + 期間伝播
+│       ├── featureRequests.ts # Feature Request CRUD + 並替
+│       └── wishItems.ts      # ウィッシュアイテム CRUD + 並替
+├── src/                      # フロントエンド
+│   ├── main.tsx              # React エントリポイント
+│   ├── App.tsx               # ルーティング定義
+│   ├── index.css             # グローバルスタイル & ダークテーマ
+│   ├── hooks/
+│   │   └── useApi.ts         # API 通信フック
+│   └── components/
+│       ├── Layout.tsx         # サイドバー + ページレイアウト
+│       ├── DailyPage.tsx      # デイリーページ
+│       ├── Diary.tsx          # BlockNote 日記エディタ
+│       ├── GoalGantt.tsx      # WBS ガントチャート
+│       ├── HabitTracker.tsx   # 習慣トラッカー
+│       ├── Schedule.tsx       # スケジュール表示
+│       ├── TodoList.tsx       # ToDo リスト
+│       ├── WishListPage.tsx   # ウィッシュ / バケットリスト
+│       ├── admin/
+│       │   └── AdminModal.tsx # 管理モーダル (Feature Requests)
+│       └── calendar/          # カレンダー機能
+│           ├── CalendarPage.tsx
+│           ├── CalendarHeader.tsx
+│           ├── CalendarMonthView.tsx
+│           ├── CalendarWeekView.tsx
+│           ├── CalendarDayView.tsx
+│           ├── CalendarDayCell.tsx
+│           ├── CalendarTimeGrid.tsx
+│           ├── CalendarEventItem.tsx
+│           ├── CalendarGoalItem.tsx
+│           ├── CalendarFormModal.tsx
+│           ├── calendarTypes.ts
+│           └── calendarUtils.ts
+├── data/                     # SQLite データベース (gitignore)
+├── docs/                     # ドキュメント
+├── package.json
+├── vite.config.ts
+└── tsconfig.json
 ```
 
-## 通信フロー
+## ルーティング
 
-```mermaid
-sequenceDiagram
-    participant User as ユーザー
-    participant Browser as ブラウザ
-    participant Vite as Vite Dev Server
-    participant Express as Express Server
-    participant DB as SQLite
+| パス | コンポーネント | 説明 |
+|------|---------------|------|
+| `/` | → `/daily` にリダイレクト | |
+| `/daily` | `DailyPage` | デイリーページ |
+| `/calendar` | `CalendarPage` | カレンダー（月/週/日） |
+| `/goals` | `GoalGantt` | 目標管理ガントチャート |
+| `/wishlist` | `WishListPage` | ウィッシュ / バケットリスト |
 
-    User->>Browser: ページアクセス
-    Browser->>Vite: リクエスト (HTML/JS/CSS)
-    Vite-->>Browser: レスポンス
-    Browser->>Browser: Reactアプリ起動
+管理モーダル（`AdminModal`）はサイドバーの歯車ボタンから開き、Feature Request を管理する。
 
-    User->>Browser: 操作（データ取得/更新）
-    Browser->>Vite: APIリクエスト (/api/*)
-    Vite->>Express: プロキシ転送
-    Express->>DB: SQLクエリ実行
-    DB-->>Express: データ
-    Express-->>Vite: JSONレスポンス
-    Vite-->>Browser: JSONレスポンス
-    Browser->>Browser: UI更新
-    Browser-->>User: 結果表示
+## レイアウト
+
+```
+┌──────────┬──────────────────────────────┐
+│          │                              │
+│ サイドバー │        メインコンテンツ         │
+│  (w-52)  │                              │
+│          │                              │
+│ デイリー   │    各ページのコンポーネント      │
+│ カレンダー │                              │
+│ 目標管理  │                              │
+│ ウィッシュ │                              │
+│          │                              │
+│──────────│                              │
+│ ⚙ 管理   │                              │
+└──────────┴──────────────────────────────┘
 ```
 
-## デプロイ構成
+## API 通信
 
-```mermaid
-graph LR
-    subgraph "開発環境"
-        Dev[開発モード<br/>npm run dev]
-        DevVite[Vite :5173]
-        DevExpress[Express :3001]
-    end
+`src/hooks/useApi.ts` で統一的な API 通信を提供:
 
-    subgraph "本番環境"
-        Build[ビルド<br/>npm run build]
-        Static[静的ファイル<br/>dist/]
-        Server[Express Server<br/>:3001]
-        DB[(SQLite DB)]
-    end
+| 関数 | 用途 |
+|------|------|
+| `useApi<T>(url)` | データ取得フック（loading, data, refetch） |
+| `apiPost<T>(url, body)` | POST リクエスト |
+| `apiPatch<T>(url, body)` | PATCH リクエスト |
+| `apiPut<T>(url, body)` | PUT リクエスト |
+| `apiDelete(url)` | DELETE リクエスト |
 
-    Dev --> DevVite
-    Dev --> DevExpress
-    Build --> Static
-    Server --> Static
-    Server --> DB
+## スタイリング
 
-    style Dev fill:#e1f5ff
-    style Build fill:#fff4e1
-    style Server fill:#fff4e1
-```
+- **Tailwind CSS 4**: ユーティリティファーストでスタイリング
+- **ダークモダンテーマ**: `src/index.css` で CSS 変数によるデザインシステムを定義
+- **カラーパレット**: 背景 `#0e0e12` / `#16161e`、テキスト `#e4e4ec`、アクセント `amber-500`、ボーダー `#2a2a3a`
+- **BlockNote カスタマイズ**: エディタのダークテーマを CSS 変数でオーバーライド
+- **タブ別テーマ**: ウィッシュリストではタブごとに amber / teal-violet のテーマが切り替わる
+
+## 共通パターン
+
+### ドラッグ＆ドロップ並替
+
+goals, featureRequests, wishItems で共通のパターン:
+
+1. HTML5 Drag and Drop API を使用（外部ライブラリ不要）
+2. `POST /{resource}/reorder` で `{ orders: [{ id, sort_order }] }` を送信
+3. サーバー側はトランザクションで一括更新
+
+### 目標の期間自動伝播
+
+`goals.ts` の `syncParentDates` 関数:
+
+- 子目標の期間変更時、親の `start_date` を子の最小値、`end_date` を子の最大値に自動更新
+- 再帰的にルートまで伝播
