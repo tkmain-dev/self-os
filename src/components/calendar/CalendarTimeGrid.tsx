@@ -53,8 +53,6 @@ export default function CalendarTimeGrid({ columns, events, onSlotClick, onEvent
     }
   }, [])
 
-  const colCount = columns.length
-
   // Group events by column date
   const eventsByDate = new Map<string, CalendarEvent[]>()
   for (const ev of events) {

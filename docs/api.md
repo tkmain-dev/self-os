@@ -94,7 +94,7 @@
 
 **レスポンス**: `200`
 ```json
-[{ "id": 1, "title": "会議", "date": "2024-01-01", "start_time": "10:00", "end_time": "11:00", "memo": "会議室A" }]
+[{ "id": 1, "title": "会議", "date": "2024-01-01", "start_time": "10:00", "end_time": "11:00", "memo": "会議室A", "source": null }]
 ```
 
 ### POST `/api/schedules`
@@ -102,14 +102,17 @@
 
 **リクエスト**:
 ```json
-{ "title": "会議", "date": "2024-01-01", "start_time": "10:00", "end_time": "11:00", "memo": "会議室A" }
+{ "title": "会議", "date": "2024-01-01", "start_time": "10:00", "end_time": "11:00", "memo": "会議室A", "source": null }
 ```
-`start_time`, `end_time`, `memo` はオプション。
+`start_time`, `end_time`, `memo`, `source` はオプション。習慣D&Dで作成する場合は `source: "habit"` を指定。
 
 **レスポンス**: `201`
 
 ### PUT `/api/schedules/:id`
-スケジュールを更新。リクエスト形式は POST と同じ。
+スケジュールを更新（全フィールド）。リクエスト形式は POST と同じ（`source` は除く）。
+
+### PATCH `/api/schedules/:id`
+スケジュールを部分更新。指定しないフィールドは既存値を保持。タイムライン上のドラッグ移動・リサイズで使用。
 
 ### DELETE `/api/schedules/:id`
 スケジュールを削除。**レスポンス**: `204`
@@ -124,7 +127,7 @@
 
 **レスポンス**: `200`
 ```json
-[{ "id": 1, "parent_id": null, "name": "運動", "sort_order": 1, "created_at": "..." }]
+[{ "id": 1, "parent_id": null, "name": "運動", "sort_order": 1, "duration": 30, "day_of_week": "1,2,3,4,5", "created_at": "..." }]
 ```
 
 ### POST `/api/habits`
@@ -135,9 +138,9 @@
 **レスポンス**: `201`
 
 ### PATCH `/api/habits/:id`
-習慣名を更新。
+習慣の設定を更新。`name`, `duration`, `day_of_week` を部分更新可能。
 
-**リクエスト**: `{ "name": "新しい習慣名" }`
+**リクエスト**: `{ "name": "新しい習慣名", "duration": 45, "day_of_week": "1,2,3,4,5" }`
 **レスポンス**: `200`
 
 ### DELETE `/api/habits/:id`

@@ -34,6 +34,7 @@ erDiagram
         string start_time
         string end_time
         string memo
+        string source
     }
 
     HABITS {
@@ -41,6 +42,8 @@ erDiagram
         int parent_id FK
         string name
         int sort_order
+        int duration
+        string day_of_week
         string created_at
     }
 
@@ -135,22 +138,26 @@ erDiagram
 | start_time | TEXT | NULL | 開始時刻（HH:MM） |
 | end_time | TEXT | NULL | 終了時刻（HH:MM） |
 | memo | TEXT | NULL | メモ |
+| source | TEXT | NULL | 作成元（`'habit'`: 習慣D&Dで作成、NULL: 通常） |
 
-時間指定あり / なしの両方に対応。
+時間指定あり / なしの両方に対応。習慣のドラッグ＆ドロップで作成したスケジュールは `source = 'habit'` で識別されカレンダーには表示されない。
 
 ### habits（習慣）
 
 | カラム名 | 型 | 制約 | 説明 |
 |---------|-----|------|------|
 | id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 習慣ID |
-| parent_id | INTEGER | NULL, FK → habits(id) ON DELETE CASCADE | 親習慣ID |
+| parent_id | INTEGER | NULL, FK → habits(id) ON DELETE CASCADE | 親習慣ID（グループ） |
 | name | TEXT | NOT NULL | 習慣名 |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+| duration | INTEGER | NOT NULL, DEFAULT 30 | 所要時間（分） |
+| day_of_week | TEXT | NOT NULL, DEFAULT '' | 実行曜日（カンマ区切り数字列、0=日〜6=土） |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
 - **階層構造**: `parent_id` による親子関係。親習慣（グループ）と子習慣の2階層
 - **カスケード削除**: 親習慣削除時に子習慣・関連ログも自動削除
 - **ソート**: 同一親グループ内で `sort_order ASC, id ASC`
+- **day_of_week**: 空文字の場合はどの曜日にも表示されない。例: `"1,2,3,4,5"` = 平日
 
 ### habit_logs（習慣ログ）
 

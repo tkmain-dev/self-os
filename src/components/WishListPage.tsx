@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useApi, apiPost, apiPatch, apiDelete } from '../hooks/useApi'
+import { useApi } from '../hooks/useApi'
 import DatePicker from './DatePicker'
 import DiaryChecklist from './DiaryChecklist'
 

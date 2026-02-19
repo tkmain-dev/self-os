@@ -5,6 +5,7 @@ export interface ScheduleItem {
   start_time: string | null
   end_time: string | null
   memo: string | null
+  source: string | null
 }
 
 export interface GoalItem {

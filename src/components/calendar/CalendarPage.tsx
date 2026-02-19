@@ -32,8 +32,12 @@ export default function CalendarPage() {
     `/api/goals?from=${range.from}&to=${range.to}`
   )
 
-  // Merge into unified events (for schedules + flat event handling)
-  const events = useMemo(() => mergeEvents(schedules, goals), [schedules, goals])
+  // Merge into unified events — exclude habit-derived schedules
+  const nonHabitSchedules = useMemo(
+    () => (schedules ?? []).filter(s => s.source !== 'habit'),
+    [schedules]
+  )
+  const events = useMemo(() => mergeEvents(nonHabitSchedules, goals), [nonHabitSchedules, goals])
 
   // Modal state
   const [showModal, setShowModal] = useState(false)

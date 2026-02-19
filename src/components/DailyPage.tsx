@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { apiPost, apiPut, apiDelete } from '../hooks/useApi'
+import { apiPost, apiPut, apiPatch, apiDelete } from '../hooks/useApi'
 import Diary from './Diary'
 
 // ── Types ──
@@ -17,6 +17,8 @@ interface Habit {
   name: string
   parent_id: number | null
   sort_order: number
+  duration: number
+  day_of_week: string
 }
 
 interface HabitNode extends Habit {
@@ -41,25 +43,6 @@ function formatDateLabel(dateStr: string): string {
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
-}
-
-function getLast7Days(): string[] {
-  const days: string[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(formatDate(d))
-  }
-  return days
-}
-
-function shortDate(dateStr: string): { date: string; day: string; isToday: boolean } {
-  const d = new Date(dateStr + 'T00:00:00')
-  return {
-    date: `${d.getMonth() + 1}/${d.getDate()}`,
-    day: dayNames[d.getDay()],
-    isToday: dateStr === formatDate(new Date()),
-  }
 }
 
 // ── Timeline constants ──
@@ -125,7 +108,7 @@ export default function DailyPage() {
         {/* Right: Diary + Habits + Goals */}
         <div className="flex-1 min-w-0 w-full space-y-6">
           <Diary date={date} />
-          <HabitSection />
+          <HabitSection date={date} />
         </div>
       </div>
     </div>
@@ -143,6 +126,14 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [memo, setMemo] = useState('')
+
+  // Drag state for move & resize
+  const [dragging, setDragging] = useState<{id: number; type: 'move'|'resize'; startY: number; origTop: number; origHeight: number} | null>(null)
+  const [ghostStyle, setGhostStyle] = useState<{top: number; height: number} | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
+
+  // Drop indicator for habit D&D
+  const [dropIndicator, setDropIndicator] = useState<number | null>(null)
 
   const fetchSchedules = useCallback(() => {
     setLoading(true)
@@ -171,6 +162,103 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
     await apiDelete(`/api/schedules/${id}`)
     fetchSchedules()
   }
+
+  // Habit D&D handlers
+  const handleHabitDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('habit-id')) return
+    e.preventDefault()
+    const rect = timelineRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const y = e.clientY - rect.top
+    const minutes = START_HOUR * 60 + (y / HOUR_HEIGHT) * 60
+    const snapped = Math.round(minutes / 15) * 15
+    const clampedMin = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - 30, snapped))
+    setDropIndicator(((clampedMin - START_HOUR * 60) / 60) * HOUR_HEIGHT)
+  }
+
+  const handleHabitDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDropIndicator(null)
+    const habitId = e.dataTransfer.getData('habit-id')
+    if (!habitId) return
+    const habitName = e.dataTransfer.getData('habit-name')
+    const duration = Number(e.dataTransfer.getData('habit-duration')) || 30
+    const rect = timelineRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const y = e.clientY - rect.top
+    const minutes = START_HOUR * 60 + (y / HOUR_HEIGHT) * 60
+    const snapped = Math.round(minutes / 15) * 15
+    const startMin = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - duration, snapped))
+    const endMin = startMin + duration
+    const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+    await apiPost('/api/schedules', {
+      title: habitName,
+      date,
+      start_time: fmt(startMin),
+      end_time: fmt(endMin),
+      source: 'habit',
+    })
+    fetchSchedules()
+  }
+
+  const handleMouseDownMove = (e: React.MouseEvent, item: ScheduleItem, origTop: number, origHeight: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragging({ id: item.id, type: 'move', startY: e.clientY, origTop, origHeight })
+    setGhostStyle({ top: origTop, height: origHeight })
+    document.body.style.userSelect = 'none'
+  }
+
+  const handleMouseDownResize = (e: React.MouseEvent, item: ScheduleItem, origTop: number, origHeight: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragging({ id: item.id, type: 'resize', startY: e.clientY, origTop, origHeight })
+    setGhostStyle({ top: origTop, height: origHeight })
+    document.body.style.userSelect = 'none'
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const onMouseMove = (e: MouseEvent) => {
+      const dy = e.clientY - dragging.startY
+      if (dragging.type === 'move') {
+        const rawTop = dragging.origTop + dy
+        const minutes = START_HOUR * 60 + (rawTop / HOUR_HEIGHT) * 60
+        const snapped = Math.round(minutes / 15) * 15
+        const maxStartMin = END_HOUR * 60 - (dragging.origHeight / HOUR_HEIGHT) * 60
+        const clampedMin = Math.max(START_HOUR * 60, Math.min(maxStartMin, snapped))
+        const newTop = ((clampedMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
+        setGhostStyle({ top: newTop, height: dragging.origHeight })
+      } else {
+        const rawHeight = dragging.origHeight + dy
+        const durationMin = Math.round((rawHeight / HOUR_HEIGHT) * 60 / 15) * 15
+        const maxDur = (END_HOUR * 60) - (START_HOUR * 60 + (dragging.origTop / HOUR_HEIGHT) * 60)
+        const clampedDur = Math.max(15, Math.min(durationMin, maxDur))
+        setGhostStyle({ top: dragging.origTop, height: (clampedDur / 60) * HOUR_HEIGHT })
+      }
+    }
+    const onMouseUp = async () => {
+      document.body.style.userSelect = ''
+      if (ghostStyle && dragging) {
+        const item = schedules.find(s => s.id === dragging.id)
+        if (item) {
+          const startMin = START_HOUR * 60 + (ghostStyle.top / HOUR_HEIGHT) * 60
+          const endMin = startMin + (ghostStyle.height / HOUR_HEIGHT) * 60
+          const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+          await apiPatch(`/api/schedules/${dragging.id}`, { start_time: fmt(startMin), end_time: fmt(endMin) })
+          fetchSchedules()
+        }
+      }
+      setDragging(null)
+      setGhostStyle(null)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [dragging, ghostStyle, schedules])
 
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
@@ -226,7 +314,10 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
         <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
       ) : (
         <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-hidden">
-          <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}>
+          <div ref={timelineRef} className="relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}
+            onDragOver={handleHabitDragOver}
+            onDragLeave={() => setDropIndicator(null)}
+            onDrop={handleHabitDrop}>
             {HOURS.map(h => (
               <div key={h} className="absolute w-full border-t border-[#1f1f2e] flex"
                 style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}>
@@ -248,10 +339,14 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
             {timedEvents.map((item, i) => {
               const style = getEventStyle(item)
               if (!style) return null
+              const topPx = parseFloat(style.top as string)
+              const heightPx = parseFloat(style.height as string)
+              const isDraggingThis = dragging?.id === item.id
               return (
                 <div key={item.id}
-                  className={`absolute left-12 right-1 z-10 ${COLORS[i % COLORS.length]} border-l-4 rounded px-2 py-0.5 overflow-hidden cursor-default group`}
-                  style={style}>
+                  className={`absolute left-12 right-1 z-10 ${COLORS[i % COLORS.length]} border-l-4 rounded px-2 py-0.5 overflow-hidden ${dragging ? (isDraggingThis ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-grab'} group`}
+                  style={{ ...style, opacity: isDraggingThis ? 0.4 : 1 }}
+                  onMouseDown={e => handleMouseDownMove(e, item, topPx, heightPx)}>
                   <div className="flex items-start justify-between gap-1">
                     <div className="min-w-0">
                       <div className="font-medium text-xs truncate">{item.title}</div>
@@ -259,12 +354,26 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
                         {item.start_time}{item.end_time ? ` - ${item.end_time}` : ''}
                       </div>
                     </div>
-                    <button onClick={() => handleDelete(item.id)}
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
                       className="opacity-0 group-hover:opacity-70 hover:!opacity-100 text-xs shrink-0">&times;</button>
                   </div>
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-amber-400/30"
+                    onMouseDown={e => handleMouseDownResize(e, item, topPx, heightPx)}
+                  />
                 </div>
               )
             })}
+
+            {dragging && ghostStyle && (
+              <div className="absolute left-12 right-1 z-30 bg-amber-500/20 border-2 border-amber-400 border-dashed rounded pointer-events-none"
+                style={{ top: `${ghostStyle.top}px`, height: `${ghostStyle.height}px` }} />
+            )}
+
+            {dropIndicator !== null && (
+              <div className="absolute left-12 right-1 z-25 border-2 border-dashed border-amber-400/60 rounded pointer-events-none"
+                style={{ top: `${dropIndicator}px`, height: '2px' }} />
+            )}
           </div>
         </div>
       )}
@@ -293,221 +402,463 @@ function buildHabitTree(habits: Habit[]): HabitNode[] {
   return roots
 }
 
-// Habit Section
 // ══════════════════════════════════════
-function HabitSection() {
+// Habit constants
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+const DURATION_PRESETS = [15, 30, 45, 60, 90, 120]
+
+// ══════════════════════════════════════
+// HabitEditPanel — modern settings for a single leaf habit
+// ══════════════════════════════════════
+function HabitEditPanel({ habit, onSave }: {
+  habit: Habit
+  onSave: (name: string, duration: number, day_of_week: string) => void
+}) {
+  const [name, setName] = useState(habit.name)
+  const [duration, setDuration] = useState(habit.duration ?? 30)
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set((habit.day_of_week || '').split(',').filter(Boolean))
+  )
+  useEffect(() => {
+    setName(habit.name)
+    setDuration(habit.duration ?? 30)
+    setSelected(new Set((habit.day_of_week || '').split(',').filter(Boolean)))
+  }, [habit.id])
+
+  const toggleDay = (d: string) => setSelected(prev => {
+    const n = new Set(prev); n.has(d) ? n.delete(d) : n.add(d); return n
+  })
+  const isCustomDuration = !DURATION_PRESETS.includes(duration)
+
+  return (
+    <div className="space-y-6">
+      {/* Name */}
+      <div>
+        <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">名前</label>
+        <input value={name} onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && onSave(name.trim() || habit.name, duration, Array.from(selected).sort().join(','))}
+          className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] outline-none focus:border-amber-500/40 transition-colors" />
+      </div>
+
+      {/* Duration */}
+      <div>
+        <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">所要時間</label>
+        <div className="flex gap-1.5 flex-wrap items-center">
+          {DURATION_PRESETS.map(p => (
+            <button key={p} type="button" onClick={() => setDuration(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                duration === p && !isCustomDuration
+                  ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20'
+                  : 'bg-[#1e1e2a] text-[#5a5a6e] hover:bg-[#252535] hover:text-[#8b8b9e]'
+              }`}>
+              {p < 60 ? `${p}分` : `${p / 60}h`}
+            </button>
+          ))}
+          <div className={`flex items-center rounded-lg border overflow-hidden transition-colors ${
+            isCustomDuration ? 'border-amber-500/40 bg-amber-500/5' : 'border-[#2a2a3a] bg-[#1e1e2a]'
+          }`}>
+            <button type="button"
+              onClick={() => setDuration(d => Math.max(5, d - 5))}
+              className="px-2.5 py-1.5 text-[#5a5a6e] hover:text-amber-400 hover:bg-white/5 active:bg-white/10 transition-colors text-sm font-semibold leading-none select-none">
+              −
+            </button>
+            <input type="text" inputMode="numeric" value={duration}
+              onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 5 && v <= 480) setDuration(v) }}
+              className="w-8 bg-transparent text-xs text-center text-[#e4e4ec] outline-none font-mono" />
+            <span className="text-[10px] text-[#5a5a6e] pr-1.5">分</span>
+            <button type="button"
+              onClick={() => setDuration(d => Math.min(480, d + 5))}
+              className="px-2.5 py-1.5 text-[#5a5a6e] hover:text-amber-400 hover:bg-white/5 active:bg-white/10 transition-colors text-sm font-semibold leading-none select-none border-l border-[#2a2a3a]">
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Day of week */}
+      <div>
+        <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">実行曜日</label>
+        <div className="flex gap-2 mb-2">
+          {DAY_LABELS.map((label, i) => {
+            const d = String(i)
+            const active = selected.has(d)
+            const isWeekend = i === 0 || i === 6
+            return (
+              <button key={d} type="button" onClick={() => toggleDay(d)}
+                className={`w-9 h-9 rounded-full text-xs font-bold transition-all select-none ${
+                  active
+                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/25 scale-110'
+                    : `bg-[#1e1e2a] ${isWeekend ? 'text-[#4a4a6e]' : 'text-[#5a5a6e]'} hover:bg-[#252535] hover:scale-105`
+                }`}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-3">
+          {[['平日', '1,2,3,4,5'], ['週末', '0,6'], ['毎日', '0,1,2,3,4,5,6']].map(([label, val]) => (
+            <button key={label} type="button"
+              onClick={() => setSelected(new Set(val.split(',')))}
+              className="text-[10px] text-amber-500/50 hover:text-amber-400 transition-colors">{label}</button>
+          ))}
+          <button type="button" onClick={() => setSelected(new Set())}
+            className="text-[10px] text-[#3a3a4e] hover:text-[#5a5a6e] transition-colors">クリア</button>
+        </div>
+      </div>
+
+      <button
+        onClick={() => onSave(name.trim() || habit.name, duration, Array.from(selected).sort().join(','))}
+        className="bg-amber-500 text-black font-bold text-sm px-5 py-2 rounded-lg hover:bg-amber-400 transition-colors">
+        保存
+      </button>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════
+// HabitManagerModal — manage all habits
+// ══════════════════════════════════════
+function HabitManagerModal({ onClose }: { onClose: () => void }) {
+  const [habits, setHabits] = useState<Habit[]>([])
+  const [selected, setSelected] = useState<number | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newParentId, setNewParentId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [selectOpen, setSelectOpen] = useState(false)
+  const selectRef = useRef<HTMLDivElement>(null)
+
+  const fetchHabits = useCallback(() => {
+    setLoading(true)
+    fetch('/api/habits').then(r => r.json()).then(h => { setHabits(h); setLoading(false) })
+  }, [])
+  useEffect(() => { fetchHabits() }, [fetchHabits])
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(e.target as Node)) setSelectOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const tree = buildHabitTree(habits)
+  const selectedHabit = habits.find(h => h.id === selected)
+  const isLeaf = selectedHabit ? !habits.some(h => h.parent_id === selectedHabit.id) : false
+  const roots = habits.filter(h => !h.parent_id)
+
+  const handleAdd = async () => {
+    if (!newName.trim()) return
+    const res = await apiPost('/api/habits', { name: newName.trim(), parent_id: newParentId })
+    setNewName('')
+    await fetchHabits()
+    setSelected((res as Habit).id)
+  }
+
+  const handleDelete = async (id: number) => {
+    const hasChildren = habits.some(h => h.parent_id === id)
+    if (!confirm(hasChildren ? 'グループと配下の習慣をすべて削除しますか？' : 'この習慣を削除しますか？')) return
+    await apiDelete(`/api/habits/${id}`)
+    if (selected === id) setSelected(null)
+    fetchHabits()
+  }
+
+  const renderNode = (node: HabitNode, depth: number): React.ReactNode => (
+    <React.Fragment key={node.id}>
+      <button
+        onClick={() => setSelected(node.id)}
+        className={`w-full flex items-center gap-2 py-1.5 text-left text-xs transition-colors group ${
+          selected === node.id
+            ? 'bg-amber-500/10 text-amber-300'
+            : 'text-[#8b8b9e] hover:bg-[#1f1f2e] hover:text-[#e4e4ec]'
+        }`}
+        style={{ paddingLeft: `${depth * 14 + 12}px`, paddingRight: '8px' }}
+      >
+        {node.children.length > 0
+          ? <span className="text-[9px] opacity-50 shrink-0">▾</span>
+          : depth > 0 ? <span className="text-[#2a2a3a] text-[10px] shrink-0">└</span>
+          : <span className="w-2 shrink-0" />
+        }
+        <span className={`flex-1 truncate ${node.children.length > 0 ? 'font-semibold text-[#8b8b9e]' : ''}`}>
+          {node.name}
+        </span>
+        {node.day_of_week && node.children.length === 0 && (
+          <span className="text-[8px] text-amber-500/40 font-mono shrink-0">
+            {node.day_of_week.split(',').filter(Boolean).map(d => DAY_LABELS[Number(d)]).join('')}
+          </span>
+        )}
+        <button onClick={e => { e.stopPropagation(); handleDelete(node.id) }}
+          className="opacity-0 group-hover:opacity-100 text-[#3a3a4e] hover:text-red-400 transition-colors text-xs shrink-0 ml-1">
+          &times;
+        </button>
+      </button>
+      {node.children.map(child => renderNode(child, depth + 1))}
+    </React.Fragment>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-[#16161e] border border-[#2a2a3a] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a3a] shrink-0">
+          <h2 className="text-sm font-bold text-[#8b8b9e] tracking-wider">HABITS 管理</h2>
+          <button onClick={onClose} className="text-[#5a5a6e] hover:text-[#e4e4ec] text-xl leading-none transition-colors">&times;</button>
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left: habit list */}
+          <div className="w-52 border-r border-[#2a2a3a] flex flex-col shrink-0">
+            {/* Add form */}
+            <div className="p-3 border-b border-[#1f1f2e] space-y-2">
+              <div className="flex gap-1">
+                <input value={newName} onChange={e => setNewName(e.target.value)}
+                  placeholder="習慣名..." onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                  className="flex-1 bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-1 text-xs text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none focus:border-amber-500/40 min-w-0" />
+                <button onClick={handleAdd}
+                  className="bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded hover:bg-amber-400 transition-colors shrink-0">
+                  +
+                </button>
+              </div>
+              {/* Custom group select */}
+              <div ref={selectRef} className="relative">
+                <button type="button"
+                  onClick={() => setSelectOpen(v => !v)}
+                  className={`w-full flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] border transition-colors focus:outline-none ${
+                    selectOpen ? 'border-amber-500/40 bg-[#1a1a26]' : 'border-[#2a2a3a] bg-[#0e0e12] hover:border-[#3a3a4e]'
+                  }`}>
+                  <span className={newParentId !== null ? 'text-[#e4e4ec]' : 'text-[#3a3a4e]'}>
+                    {newParentId !== null ? (roots.find(h => h.id === newParentId)?.name ?? '—') : 'グループなし（ルート）'}
+                  </span>
+                  <span className={`text-[8px] text-[#3a3a4e] transition-transform duration-150 ${selectOpen ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+                {selectOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1a26] border border-[#2a2a3a] rounded-xl overflow-hidden shadow-2xl z-50">
+                    {[{ id: null as number | null, name: 'グループなし（ルート）' }, ...roots].map(opt => (
+                      <button key={String(opt.id)} type="button"
+                        onClick={() => { setNewParentId(opt.id); setSelectOpen(false) }}
+                        className={`w-full text-left px-3 py-2 text-[11px] transition-colors ${
+                          newParentId === opt.id
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'text-[#8b8b9e] hover:bg-[#252535] hover:text-[#e4e4ec]'
+                        }`}>
+                        {opt.id === null && <span className="text-[#3a3a4e] mr-1.5 text-[9px]">—</span>}
+                        {opt.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Tree */}
+            <div className="flex-1 overflow-y-auto py-1">
+              {loading
+                ? <p className="text-[#3a3a4e] text-xs text-center py-4">読み込み中...</p>
+                : tree.length === 0
+                  ? <p className="text-[#3a3a4e] text-xs text-center py-4">習慣がありません</p>
+                  : tree.map(node => renderNode(node, 0))
+              }
+            </div>
+          </div>
+
+          {/* Right: edit panel */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {!selectedHabit ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                <p className="text-[#3a3a4e] text-xs">左の一覧から習慣を選択</p>
+                <p className="text-[#2a2a3a] text-[10px]">子習慣（グループでないもの）は曜日・時間を設定できます</p>
+              </div>
+            ) : isLeaf ? (
+              <HabitEditPanel
+                habit={selectedHabit}
+                onSave={async (name, dur, dow) => {
+                  await apiPatch(`/api/habits/${selectedHabit.id}`, { name, duration: dur, day_of_week: dow })
+                  fetchHabits()
+                }}
+              />
+            ) : (
+              <div className="space-y-5">
+                <div>
+                  <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">グループ名</label>
+                  <div className="flex gap-2">
+                    <input
+                      defaultValue={selectedHabit.name}
+                      key={selectedHabit.id}
+                      id="group-name-input"
+                      className="flex-1 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] outline-none focus:border-amber-500/40 transition-colors" />
+                    <button
+                      onClick={async () => {
+                        const el = document.getElementById('group-name-input') as HTMLInputElement
+                        if (el?.value.trim()) {
+                          await apiPatch(`/api/habits/${selectedHabit.id}`, { name: el.value.trim() })
+                          fetchHabits()
+                        }
+                      }}
+                      className="bg-amber-500 text-black font-bold text-sm px-4 py-2 rounded-lg hover:bg-amber-400 transition-colors">
+                      保存
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-[#3a3a4e]">グループには曜日・時間の設定はありません。子習慣に個別に設定してください。</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════
+// HabitSection — daily habit list (date-filtered)
+// ══════════════════════════════════════
+function HabitSection({ date }: { date: string }) {
   const [habits, setHabits] = useState<Habit[]>([])
   const [logs, setLogs] = useState<HabitLog[]>([])
-  const [name, setName] = useState('')
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const [showManager, setShowManager] = useState(false)
   const [loading, setLoading] = useState(true)
-  // inline child-add: habitId → current input value
-  const [inlineAdd, setInlineAdd] = useState<Record<number, string>>({})
 
-  const days = getLast7Days()
+  const dateDay = new Date(date + 'T00:00:00').getDay()
 
   const fetchData = useCallback(() => {
     setLoading(true)
     Promise.all([
       fetch('/api/habits').then(r => r.json()),
-      fetch(`/api/habits/logs?from=${days[0]}&to=${days[6]}`).then(r => r.json()),
-    ]).then(([h, l]) => {
-      setHabits(h)
-      setLogs(l)
-      setLoading(false)
-    })
-  }, [days[0], days[6]])
-
+      fetch(`/api/habits/logs?from=${date}&to=${date}`).then(r => r.json()),
+    ]).then(([h, l]) => { setHabits(h); setLogs(l); setLoading(false) })
+  }, [date])
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Add root-level habit
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    await apiPost('/api/habits', { name: name.trim() })
-    setName('')
-    fetchData()
-  }
+  // Only leaf habits (no children) scheduled for today's weekday
+  const leafHabitsToday = habits.filter(h => {
+    const isLeaf = !habits.some(other => other.parent_id === h.id)
+    const hasSchedule = h.day_of_week && h.day_of_week.split(',').filter(Boolean).length > 0
+    return isLeaf && hasSchedule && h.day_of_week.split(',').filter(Boolean).includes(String(dateDay))
+  })
 
-  // Add child habit inline under parentId
-  const handleAddChild = async (parentId: number) => {
-    const childName = inlineAdd[parentId]?.trim()
-    if (!childName) return
-    await apiPost('/api/habits', { name: childName, parent_id: parentId })
-    setInlineAdd(prev => { const n = { ...prev }; delete n[parentId]; return n })
-    // Ensure parent is expanded
-    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
-    fetchData()
-  }
+  const isChecked = (habitId: number) => logs.some(l => l.habit_id === habitId && l.date === date)
 
-  const handleToggle = async (habitId: number, date: string) => {
+  const handleToggle = async (habitId: number) => {
     await apiPost(`/api/habits/${habitId}/logs`, { date })
     fetchData()
   }
 
-  const handleDeleteHabit = async (id: number, hasChildren: boolean) => {
-    const msg = hasChildren
-      ? 'このグループと配下の習慣をすべて削除しますか？'
-      : 'この習慣を削除しますか？'
-    if (!confirm(msg)) return
-    await apiDelete(`/api/habits/${id}`)
-    fetchData()
-  }
+  // Build display items: groups as boxes, standalone as individual cards
+  type DisplayItem =
+    | { type: 'group'; parentId: number; parentName: string; habits: Habit[] }
+    | { type: 'standalone'; habit: Habit }
 
-  const toggleCollapse = (id: number) => {
-    setCollapsed(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const openInlineAdd = (parentId: number) => {
-    setInlineAdd(prev => prev[parentId] !== undefined ? prev : { ...prev, [parentId]: '' })
-    setCollapsed(prev => { const n = new Set(prev); n.delete(parentId); return n })
-  }
-
-  const isChecked = (habitId: number, date: string) =>
-    logs.some(l => l.habit_id === habitId && l.date === date)
-
-  const tree = buildHabitTree(habits)
-
-  if (loading) return <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
-
-  // Flatten tree for rendering, respecting collapsed state
-  const flatRows: { node: HabitNode; depth: number }[] = []
-  const walk = (nodes: HabitNode[], depth: number) => {
-    for (const n of nodes) {
-      flatRows.push({ node: n, depth })
-      if (!collapsed.has(n.id)) walk(n.children, depth + 1)
+  const displayItems: DisplayItem[] = []
+  const seenGroups = new Set<number>()
+  for (const h of leafHabitsToday) {
+    if (h.parent_id !== null) {
+      if (!seenGroups.has(h.parent_id)) {
+        seenGroups.add(h.parent_id)
+        displayItems.push({
+          type: 'group',
+          parentId: h.parent_id,
+          parentName: habits.find(p => p.id === h.parent_id)?.name ?? '',
+          habits: leafHabitsToday.filter(c => c.parent_id === h.parent_id),
+        })
+      }
+    } else {
+      displayItems.push({ type: 'standalone', habit: h })
     }
   }
-  walk(tree, 0)
+
+  const HabitItem = ({ habit, inGroup }: { habit: Habit; inGroup?: boolean }) => {
+    const checked = isChecked(habit.id)
+    return (
+      <div
+        className={`flex items-center gap-2.5 px-3 py-2.5 transition-all ${
+          inGroup
+            ? `rounded-lg ${checked ? 'bg-amber-500/5' : 'hover:bg-[#1f1f2e]'}`
+            : `rounded-xl border ${checked ? 'bg-amber-500/5 border-amber-500/15' : 'bg-[#16161e] border-[#2a2a3a] hover:border-[#3a3a4e]'}`
+        }`}>
+        {/* Drag handle */}
+        <span
+          draggable
+          onDragStart={e => {
+            e.dataTransfer.setData('habit-id', String(habit.id))
+            e.dataTransfer.setData('habit-name', habit.name)
+            e.dataTransfer.setData('habit-duration', String(habit.duration || 30))
+          }}
+          className="cursor-grab text-[#2a2a3a] hover:text-amber-400 transition-colors text-sm select-none shrink-0"
+          title="タイムラインにドラッグして予定を設定">
+          ⠿
+        </span>
+        {/* Name */}
+        <div className="flex-1 min-w-0">
+          <div className={`text-xs font-medium truncate ${checked ? 'text-[#3a3a4e] line-through' : 'text-[#e4e4ec]'}`}>
+            {habit.name}
+          </div>
+        </div>
+        {/* Duration badge */}
+        {habit.duration > 0 && (
+          <span className={`text-[9px] shrink-0 font-mono px-1.5 py-0.5 rounded ${
+            checked ? 'text-[#2a2a3a]' : 'text-[#3a3a4e] bg-[#1e1e2a]'
+          }`}>
+            {habit.duration}分
+          </span>
+        )}
+        {/* Done toggle */}
+        <button onClick={() => handleToggle(habit.id)}
+          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs shrink-0 transition-all ${
+            checked
+              ? 'bg-amber-500 border-amber-500 text-black shadow-md shadow-amber-500/25'
+              : 'border-[#3a3a4e] hover:border-amber-500 text-transparent hover:scale-110'
+          }`}>
+          ✓
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">HABITS</h3>
-        <form onSubmit={handleAdd} className="flex gap-1 items-center">
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="新しい習慣..."
-            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-[#e4e4ec] placeholder:text-[#3a3a4e]" />
-          <button type="submit" className="bg-amber-500 text-black font-semibold px-2 py-1 rounded-lg text-xs hover:bg-amber-400 transition-colors">追加</button>
-        </form>
+        <button onClick={() => setShowManager(true)}
+          className="text-xs text-[#5a5a6e] hover:text-amber-400 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg border border-[#2a2a3a] hover:border-amber-500/30">
+          ⚙ 管理
+        </button>
       </div>
 
-      {habits.length === 0 ? (
-        <p className="text-[#5a5a6e] text-center py-4 text-xs">習慣を追加してみましょう</p>
-      ) : (
-        <div className="bg-[#16161e] rounded-xl shadow-lg overflow-auto border border-[#2a2a3a]">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#2a2a3a]">
-                <th className="text-left p-2 min-w-[130px] text-[#8b8b9e] text-xs font-medium">習慣</th>
-                {days.map(d => {
-                  const info = shortDate(d)
-                  return (
-                    <th key={d} className={`p-1.5 text-center w-10 ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                      <div className={`text-[10px] ${info.isToday ? 'text-amber-400 font-bold' : 'text-[#5a5a6e]'}`}>{info.date}</div>
-                      <div className={`text-[10px] ${info.isToday ? 'text-amber-400/70' : 'text-[#5a5a6e]/50'}`}>{info.day}</div>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {flatRows.map(({ node, depth }) => {
-                const isGroup = node.children.length > 0 || inlineAdd[node.id] !== undefined
-                const hasChildren = node.children.length > 0
-                const isCollapsed = collapsed.has(node.id)
-                const showingInlineAdd = inlineAdd[node.id] !== undefined
-                return (
-                  <React.Fragment key={node.id}>
-                    <tr className={`border-b border-[#1f1f2e] last:border-0 ${hasChildren ? 'bg-[#0e0e12]/60' : ''}`}>
-                      <td className="p-2 text-xs" style={{ paddingLeft: `${depth * 16 + 8}px` }}>
-                        <div className="flex items-center gap-1.5">
-                          {hasChildren ? (
-                            <button onClick={() => toggleCollapse(node.id)}
-                              className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center leading-none">
-                              {isCollapsed ? '▸' : '▾'}
-                            </button>
-                          ) : (
-                            <span className="w-4 shrink-0" />
-                          )}
-                          <span className={hasChildren ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
-                            {node.name}
-                          </span>
-                          <span className="flex items-center gap-1 ml-1">
-                            {!showingInlineAdd && (
-                              <button onClick={() => openInlineAdd(node.id)}
-                                title="子習慣を追加"
-                                className="text-[#3a3a4e] hover:text-amber-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
-                                +
-                              </button>
-                            )}
-                            <button onClick={() => handleDeleteHabit(node.id, isGroup)}
-                              className="text-[#5a5a6e] hover:text-red-400 transition-colors text-sm w-5 h-5 flex items-center justify-center leading-none">
-                              &times;
-                            </button>
-                          </span>
-                        </div>
-                      </td>
-                      {days.map(d => {
-                        const info = shortDate(d)
-                        if (hasChildren) {
-                          const childIds = node.children.map(c => c.id)
-                          const doneCount = childIds.filter(cid => isChecked(cid, d)).length
-                          return (
-                            <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                              {childIds.length > 0 && (
-                                <span className={`text-[10px] font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
-                                  {doneCount}/{childIds.length}
-                                </span>
-                              )}
-                            </td>
-                          )
-                        }
-                        const checked = isChecked(node.id, d)
-                        return (
-                          <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                            <button onClick={() => handleToggle(node.id, d)}
-                              className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
-                                checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
-                              }`}>
-                              {checked ? '✓' : ''}
-                            </button>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                    {/* Inline child-add row */}
-                    {showingInlineAdd && (
-                      <tr className="border-b border-[#1f1f2e] bg-[#0e0e12]/40">
-                        <td colSpan={days.length + 1} style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }} className="py-1.5 pr-3">
-                          <form onSubmit={e => { e.preventDefault(); handleAddChild(node.id) }} className="flex gap-1 items-center">
-                            <span className="text-[#3a3a4e] text-xs mr-0.5">└</span>
-                            <input
-                              autoFocus
-                              value={inlineAdd[node.id] ?? ''}
-                              onChange={e => setInlineAdd(prev => ({ ...prev, [node.id]: e.target.value }))}
-                              placeholder="子習慣名..."
-                              className="flex-1 bg-transparent border-b border-[#2a2a3a] focus:border-amber-500/50 text-xs text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none py-0.5"
-                              onKeyDown={e => {
-                                if (e.key === 'Escape') setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })
-                              }}
-                            />
-                            <button type="submit" className="text-xs text-amber-500 hover:text-amber-400 px-1">追加</button>
-                            <button type="button" onClick={() => setInlineAdd(prev => { const n = { ...prev }; delete n[node.id]; return n })}
-                              className="text-[10px] text-[#5a5a6e] hover:text-[#8b8b9e]">キャンセル</button>
-                          </form>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                )
-              })}
-            </tbody>
-          </table>
+      {loading ? (
+        <p className="text-[#5a5a6e] text-xs">読み込み中...</p>
+      ) : leafHabitsToday.length === 0 ? (
+        <div className="text-center py-5 bg-[#16161e] rounded-xl border border-[#2a2a3a]">
+          <p className="text-[#3a3a4e] text-xs mb-2">今日の習慣が設定されていません</p>
+          <button onClick={() => setShowManager(true)}
+            className="text-xs text-amber-500/60 hover:text-amber-400 transition-colors">
+            + 管理メニューから習慣を設定
+          </button>
         </div>
+      ) : (
+        <div className="space-y-2">
+          {displayItems.map((item, idx) =>
+            item.type === 'standalone' ? (
+              <HabitItem key={item.habit.id} habit={item.habit} />
+            ) : (
+              <div key={`group-${item.parentId}-${idx}`}
+                className="bg-[#16161e] border border-[#2a2a3a] rounded-xl overflow-hidden">
+                {/* Group header */}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1a26] border-b border-[#2a2a3a]">
+                  <span className="text-[9px] text-[#3a3a4e]">▤</span>
+                  <span className="text-[10px] font-semibold text-[#5a5a6e] tracking-wider uppercase">{item.parentName}</span>
+                  <span className="ml-auto text-[9px] text-[#2a2a3a] font-mono">
+                    {item.habits.filter(h => isChecked(h.id)).length}/{item.habits.length}
+                  </span>
+                </div>
+                {/* Children */}
+                <div className="px-1 py-1 space-y-0.5">
+                  {item.habits.map(h => <HabitItem key={h.id} habit={h} inGroup />)}
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {showManager && (
+        <HabitManagerModal onClose={() => { setShowManager(false); fetchData() }} />
       )}
     </div>
   )

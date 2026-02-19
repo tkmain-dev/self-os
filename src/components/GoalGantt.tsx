@@ -452,10 +452,6 @@ export default function GoalGantt() {
     refetch()
   }
 
-  const startTitleEdit = (g: Goal) => {
-    setEditingTitleId(g.id)
-    setEditingTitleValue(g.title)
-  }
 
   const handleTitleSave = async () => {
     if (editingTitleId === null) return

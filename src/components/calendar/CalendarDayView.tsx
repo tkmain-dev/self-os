@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import CalendarTimeGrid from './CalendarTimeGrid'
-import { formatDate, buildGoalTree, calcNodeHeight } from './calendarUtils'
+import { formatDate, buildGoalTree } from './calendarUtils'
 import type { GoalItem, GoalTreeNode, CalendarEvent } from './calendarTypes'
 
 interface CalendarDayViewProps {

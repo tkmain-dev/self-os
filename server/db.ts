@@ -106,5 +106,8 @@ db.exec(`
 try { db.exec(`ALTER TABLE feature_requests ADD COLUMN commit_message TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE habits ADD COLUMN parent_id INTEGER`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE habits ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE habits ADD COLUMN duration INTEGER NOT NULL DEFAULT 30`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE habits ADD COLUMN day_of_week TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE schedules ADD COLUMN source TEXT`) } catch { /* already exists */ }
 
 export default db;

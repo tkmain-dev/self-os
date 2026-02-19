@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import CalendarDayCell from './CalendarDayCell'
 import {
-  getMonthGrid, formatDate, diffDays, WEEKDAY_LABELS_SHORT,
+  getMonthGrid, formatDate, WEEKDAY_LABELS_SHORT,
   buildGoalTree, layoutWeekBands, calcWeekBandsHeight,
 } from './calendarUtils'
 import type { GoalItem, CalendarEvent, BandSegment } from './calendarTypes'
@@ -93,7 +93,7 @@ export default function CalendarMonthView({
   goals,
   onDateClick,
   onEventClick,
-  onNavigateToDay,
+  onNavigateToDay: _onNavigateToDay,
 }: CalendarMonthViewProps) {
   const year = parseInt(anchorDate.slice(0, 4), 10)
   const month = parseInt(anchorDate.slice(5, 7), 10)
