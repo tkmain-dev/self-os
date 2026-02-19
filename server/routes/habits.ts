@@ -4,15 +4,30 @@ import db from '../db';
 const router = Router();
 
 router.get('/', (_req, res) => {
-  const habits = db.prepare('SELECT * FROM habits ORDER BY created_at ASC').all();
+  const habits = db.prepare('SELECT * FROM habits ORDER BY sort_order ASC, created_at ASC').all();
   res.json(habits);
 });
 
 router.post('/', (req, res) => {
-  const { name } = req.body;
-  const result = db.prepare('INSERT INTO habits (name) VALUES (?)').run(name);
+  const { name, parent_id } = req.body;
+  const pid = parent_id ?? null;
+  const maxOrder = db.prepare(
+    'SELECT COALESCE(MAX(sort_order), 0) as m FROM habits WHERE COALESCE(parent_id, -1) = ?'
+  ).get(pid ?? -1) as { m: number };
+  const result = db.prepare(
+    'INSERT INTO habits (name, parent_id, sort_order) VALUES (?, ?, ?)'
+  ).run(name, pid, maxOrder.m + 1);
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(habit);
+});
+
+router.patch('/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id) as Record<string, unknown>;
+  if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
+  const { name } = req.body;
+  db.prepare('UPDATE habits SET name = ? WHERE id = ?').run(name ?? existing.name, req.params.id);
+  const updated = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
 router.delete('/:id', (req, res) => {

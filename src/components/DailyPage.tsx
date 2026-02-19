@@ -15,11 +15,27 @@ interface ScheduleItem {
 interface Habit {
   id: number
   name: string
+  parent_id: number | null
+  sort_order: number
+}
+
+interface HabitNode extends Habit {
+  children: HabitNode[]
 }
 
 interface HabitLog {
   habit_id: number
   date: string
+}
+
+interface Goal {
+  id: number
+  title: string
+  issue_type: string
+  status: string
+  start_date: string
+  end_date: string
+  parent_id: number | null
 }
 
 // ── Helpers ──
@@ -114,10 +130,11 @@ export default function DailyPage() {
           <ScheduleTimeline date={date} isToday={isToday} />
         </div>
 
-        {/* Right: Diary + Habits */}
+        {/* Right: Diary + Habits + Goals */}
         <div className="flex-1 min-w-0 w-full space-y-6">
           <Diary date={date} />
           <HabitSection />
+          <MonthlyGoalsSection />
         </div>
       </div>
     </div>
@@ -265,12 +282,34 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 }
 
 // ══════════════════════════════════════
+// ── Build habit tree from flat list ──
+function buildHabitTree(habits: Habit[]): HabitNode[] {
+  const map = new Map<number, HabitNode>()
+  const roots: HabitNode[] = []
+  for (const h of habits) map.set(h.id, { ...h, children: [] })
+  for (const node of map.values()) {
+    if (node.parent_id && map.has(node.parent_id)) {
+      map.get(node.parent_id)!.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+  const sort = (nodes: HabitNode[]) => {
+    nodes.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+    for (const n of nodes) sort(n.children)
+  }
+  sort(roots)
+  return roots
+}
+
 // Habit Section
 // ══════════════════════════════════════
 function HabitSection() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [logs, setLogs] = useState<HabitLog[]>([])
   const [name, setName] = useState('')
+  const [parentId, setParentId] = useState<number | ''>('')
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
 
   const days = getLast7Days()
@@ -292,7 +331,9 @@ function HabitSection() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    await apiPost('/api/habits', { name: name.trim() })
+    const body: { name: string; parent_id?: number } = { name: name.trim() }
+    if (parentId !== '') body.parent_id = parentId as number
+    await apiPost('/api/habits', body)
     setName('')
     fetchData()
   }
@@ -302,23 +343,54 @@ function HabitSection() {
     fetchData()
   }
 
-  const handleDeleteHabit = async (id: number) => {
+  const handleDeleteHabit = async (id: number, hasChildren: boolean) => {
+    const msg = hasChildren
+      ? 'このグループと配下の習慣をすべて削除しますか？'
+      : 'この習慣を削除しますか？'
+    if (!confirm(msg)) return
     await apiDelete(`/api/habits/${id}`)
     fetchData()
+  }
+
+  const toggleCollapse = (id: number) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   const isChecked = (habitId: number, date: string) =>
     logs.some(l => l.habit_id === habitId && l.date === date)
 
+  const tree = buildHabitTree(habits)
+  // Root habits with no children (for parent selector)
+  const rootHabits = habits.filter(h => h.parent_id === null)
+
   if (loading) return <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
+
+  // Flatten tree for rendering, respecting collapsed state
+  const flatRows: { node: HabitNode; depth: number }[] = []
+  const walk = (nodes: HabitNode[], depth: number) => {
+    for (const n of nodes) {
+      flatRows.push({ node: n, depth })
+      if (!collapsed.has(n.id)) walk(n.children, depth + 1)
+    }
+  }
+  walk(tree, 0)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">HABITS</h3>
-        <form onSubmit={handleAdd} className="flex gap-1">
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="新しい習慣..."
-            className="bg-white/80 border border-stone-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-amber-400/50" />
+        <form onSubmit={handleAdd} className="flex gap-1 items-center">
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="習慣名..."
+            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-1 text-xs w-28 focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-[#e4e4ec] placeholder:text-[#3a3a4e]" />
+          <select value={parentId} onChange={e => setParentId(e.target.value === '' ? '' : Number(e.target.value))}
+            className="bg-[#0e0e12] border border-[#2a2a3a] rounded px-1 py-1 text-xs text-[#8b8b9e] focus:outline-none focus:ring-2 focus:ring-amber-400/50 max-w-[80px]">
+            <option value="">グループなし</option>
+            {rootHabits.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+          </select>
           <button type="submit" className="bg-amber-500 text-black font-semibold px-2 py-1 rounded-lg text-xs hover:bg-amber-400 transition-colors">追加</button>
         </form>
       </div>
@@ -330,7 +402,7 @@ function HabitSection() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a3a]">
-                <th className="text-left p-2 min-w-[80px] text-[#8b8b9e] text-xs font-medium">習慣</th>
+                <th className="text-left p-2 min-w-[100px] text-[#8b8b9e] text-xs font-medium">習慣</th>
                 {days.map(d => {
                   const info = shortDate(d)
                   return (
@@ -344,30 +416,165 @@ function HabitSection() {
               </tr>
             </thead>
             <tbody>
-              {habits.map(habit => (
-                <tr key={habit.id} className="border-b border-[#1f1f2e] last:border-0">
-                  <td className="p-2 font-medium text-[#e4e4ec] text-xs">{habit.name}</td>
-                  {days.map(d => {
-                    const info = shortDate(d)
-                    const checked = isChecked(habit.id, d)
-                    return (
-                      <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
-                        <button onClick={() => handleToggle(habit.id, d)}
-                          className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
-                            checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
-                          }`}>
-                          {checked ? '✓' : ''}
-                        </button>
-                      </td>
-                    )
-                  })}
-                  <td className="p-1.5">
-                    <button onClick={() => handleDeleteHabit(habit.id)} className="text-[#5a5a6e] hover:text-red-400 text-xs">&times;</button>
-                  </td>
-                </tr>
-              ))}
+              {flatRows.map(({ node, depth }) => {
+                const isGroup = node.children.length > 0
+                const isCollapsed = collapsed.has(node.id)
+                return (
+                  <tr key={node.id} className={`border-b border-[#1f1f2e] last:border-0 ${isGroup ? 'bg-[#0e0e12]/60' : ''}`}>
+                    <td className="p-2 text-xs" style={{ paddingLeft: `${depth * 16 + 8}px` }}>
+                      <div className="flex items-center gap-1">
+                        {isGroup ? (
+                          <button onClick={() => toggleCollapse(node.id)}
+                            className="text-[#5a5a6e] hover:text-amber-400 transition-colors w-4 shrink-0 text-center leading-none">
+                            {isCollapsed ? '▸' : '▾'}
+                          </button>
+                        ) : (
+                          <span className="w-4 shrink-0" />
+                        )}
+                        <span className={isGroup ? 'font-semibold text-[#8b8b9e]' : 'font-medium text-[#e4e4ec]'}>
+                          {node.name}
+                        </span>
+                      </div>
+                    </td>
+                    {days.map(d => {
+                      const info = shortDate(d)
+                      if (isGroup) {
+                        // Show completion count for group's children on this day
+                        const childIds = node.children.map(c => c.id)
+                        const doneCount = childIds.filter(cid => isChecked(cid, d)).length
+                        return (
+                          <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
+                            {childIds.length > 0 && (
+                              <span className={`text-[10px] font-mono ${doneCount === childIds.length ? 'text-amber-400' : 'text-[#3a3a4e]'}`}>
+                                {doneCount}/{childIds.length}
+                              </span>
+                            )}
+                          </td>
+                        )
+                      }
+                      const checked = isChecked(node.id, d)
+                      return (
+                        <td key={d} className={`p-1.5 text-center ${info.isToday ? 'bg-amber-500/5' : ''}`}>
+                          <button onClick={() => handleToggle(node.id, d)}
+                            className={`w-6 h-6 rounded border-2 transition-colors text-xs ${
+                              checked ? 'bg-amber-500 border-amber-500 text-black' : 'border-[#2a2a3a] hover:border-amber-500'
+                            }`}>
+                            {checked ? '✓' : ''}
+                          </button>
+                        </td>
+                      )
+                    })}
+                    <td className="p-1.5">
+                      <button onClick={() => handleDeleteHabit(node.id, isGroup)}
+                        className="text-[#5a5a6e] hover:text-red-400 text-xs">&times;</button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════
+// Monthly Goals Section
+// ══════════════════════════════════════
+function MonthlyGoalsSection() {
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [open, setOpen] = useState(true)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/goals').then(r => r.json()).then((data: Goal[]) => {
+      setGoals(data)
+      setLoading(false)
+    })
+  }, [])
+
+  const today = new Date()
+  const thisYear = today.getFullYear()
+  const thisMonth = today.getMonth() // 0-indexed
+  const thisMonthStart = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`
+  const thisMonthEnd = new Date(thisYear, thisMonth + 1, 0).toISOString().split('T')[0]
+
+  const lastMonthDate = new Date(thisYear, thisMonth - 1, 1)
+  const lastMonthStart = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}-01`
+  const lastMonthEnd = new Date(thisYear, thisMonth, 0).toISOString().split('T')[0]
+
+  const inRange = (g: Goal, from: string, to: string) =>
+    g.start_date <= to && g.end_date >= from
+
+  const isTopLevel = (g: Goal) => g.parent_id === null || g.issue_type === 'epic'
+
+  const thisMonthGoals = goals.filter(g => inRange(g, thisMonthStart, thisMonthEnd) && isTopLevel(g))
+  const lastMonthGoals = goals.filter(g => inRange(g, lastMonthStart, lastMonthEnd) && isTopLevel(g))
+
+  const statusBadge = (status: string) => {
+    if (status === 'done') return 'bg-emerald-500/20 text-emerald-400'
+    if (status === 'in_progress') return 'bg-amber-500/20 text-amber-400'
+    return 'bg-[#2a2a3a] text-[#5a5a6e]'
+  }
+  const statusLabel = (status: string) => {
+    if (status === 'done') return '完了'
+    if (status === 'in_progress') return '進行中'
+    return '未着手'
+  }
+
+  const monthLabel = (year: number, month: number) => `${year === thisYear ? '' : year + '年'}${month + 1}月`
+
+  if (loading) return null
+  if (thisMonthGoals.length === 0 && lastMonthGoals.length === 0) return null
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <button onClick={() => setOpen(o => !o)}
+          className="text-[#5a5a6e] hover:text-amber-400 transition-colors text-xs leading-none">
+          {open ? '▾' : '▸'}
+        </button>
+        <h3 className="text-sm font-bold text-[#8b8b9e] tracking-wider">GOALS</h3>
+      </div>
+
+      {open && (
+        <div className="space-y-3">
+          {/* 今月 */}
+          {thisMonthGoals.length > 0 && (
+            <div>
+              <p className="text-[10px] text-[#5a5a6e] mb-1 pl-1">{monthLabel(thisYear, thisMonth)}</p>
+              <div className="space-y-1">
+                {thisMonthGoals.map(g => (
+                  <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#16161e] border border-[#2a2a3a]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60 shrink-0" />
+                    <span className="flex-1 text-xs text-[#e4e4ec] truncate">{g.title}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(g.status)}`}>
+                      {statusLabel(g.status)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 先月（薄め表示） */}
+          {lastMonthGoals.length > 0 && (
+            <div className="opacity-40">
+              <p className="text-[10px] text-[#5a5a6e] mb-1 pl-1">{monthLabel(lastMonthDate.getFullYear(), lastMonthDate.getMonth())}</p>
+              <div className="space-y-1">
+                {lastMonthGoals.map(g => (
+                  <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#16161e] border border-[#2a2a3a]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5a5a6e] shrink-0" />
+                    <span className="flex-1 text-xs text-[#8b8b9e] truncate">{g.title}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(g.status)}`}>
+                      {statusLabel(g.status)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
