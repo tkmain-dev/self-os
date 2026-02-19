@@ -42,8 +42,9 @@ WBS（Work Breakdown Structure）ベースのガントチャートで目標を�
 
 - **Feature Requests**: 開発要望のCRUD管理。ステータス（pending/in_progress/done/rejected）
 - **完了済み分離表示**: 完了・却下の項目は左パネルに分離表示
+- **コミットメッセージ記録**: 完了済みの項目に対応する git コミットを記録・表示
 - **ドラッグ並替**: 優先順位をドラッグ＆ドロップで変更
-- **日記パネル**: 編集中に右側に日記を表示
+- **日記パネル**: 編集中に右側に日記を表示（行単位でチェックボックス＋グレーアウト）
 
 ## 技術スタック
 
@@ -110,6 +111,8 @@ techo-app/
 │       ├── Schedule.tsx       # スケジュール表示
 │       ├── TodoList.tsx       # ToDo リスト
 │       ├── WishListPage.tsx   # ウィッシュ / バケットリスト
+│       ├── DatePicker.tsx     # 日付ピッカーコンポーネント
+│       ├── DiaryChecklist.tsx # 日記チェックリスト（グレーアウト）
 │       ├── admin/
 │       │   └── AdminModal.tsx # 管理モーダル (Feature Requests)
 │       └── calendar/          # カレンダー機能

@@ -256,6 +256,12 @@ body {
   font-style: italic;
 }
 
+/* ── BlockNote gray text: faded diary entries (checked via DiaryChecklist) ── */
+[data-text-color=gray],
+.bn-block:has(> .bn-block-content[data-text-color=gray]) {
+  color: rgba(155, 154, 151, 0.18) !important;
+}
+
 /* ── Mantine overrides for dark theme ── */
 .mantine-root,
 [data-mantine-color-scheme] {

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi, apiPost, apiPatch, apiDelete } from '../hooks/useApi'
+import DatePicker from './DatePicker'
+import DiaryChecklist from './DiaryChecklist'
 
 interface WishItem {
   id: number
@@ -122,40 +124,6 @@ function shiftDate(dateStr: string, delta: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function parseBlockNoteContent(raw: string): string {
-  if (!raw) return ''
-  try {
-    const blocks = JSON.parse(raw)
-    if (!Array.isArray(blocks)) return raw
-    return blocksToText(blocks, 0).trimEnd()
-  } catch {
-    return raw
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function blocksToText(blocks: any[], depth: number): string {
-  let out = ''
-  const indent = '  '.repeat(depth)
-  for (const block of blocks) {
-    const text = (block.content ?? [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => c.text ?? '')
-      .join('')
-    if (block.type === 'bulletListItem' || block.type === 'numberedListItem') {
-      out += `${indent}・${text}\n`
-    } else if (text) {
-      out += `${indent}${text}\n`
-    } else {
-      out += '\n'
-    }
-    if (block.children?.length) {
-      out += blocksToText(block.children, depth + 1)
-    }
-  }
-  return out
-}
-
 async function safeFetch<T>(method: 'POST' | 'PATCH' | 'DELETE', url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
@@ -184,8 +152,8 @@ export default function WishListPage() {
 
   // Diary state
   const [diaryDate, setDiaryDate] = useState(todayStr)
-  const { data: diaryEntry } = useApi<DiaryEntry>(`/api/diary/${diaryDate}`)
-  const diaryText = parseBlockNoteContent(diaryEntry?.content ?? '')
+  const { data: diaryEntry, refetch: refetchDiary } = useApi<DiaryEntry>(`/api/diary/${diaryDate}`)
+  const [diaryFlush, setDiaryFlush] = useState(0)
 
   // Ticket modal state
   const [ticketItem, setTicketItem] = useState<WishItem | null>(null)
@@ -202,6 +170,7 @@ export default function WishListPage() {
   }, [showForm, editingId])
 
   const resetForm = () => {
+    setDiaryFlush(n => n + 1)
     setForm({ title: '', price: '', url: '', deadline: '', memo: '' })
     setShowForm(false)
     setEditingId(null)
@@ -450,11 +419,12 @@ export default function WishListPage() {
                     />
                   </div>
                 )}
-                <input
-                  type="date"
+                <DatePicker
                   value={form.deadline}
-                  onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))}
-                  className={`bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white ${theme.focusBorder} focus:outline-none transition-colors ${activeTab === 'bucket' ? 'col-span-2' : ''}`}
+                  onChange={v => setForm(f => ({ ...f, deadline: v }))}
+                  placeholder="期限を選択"
+                  accentColor={activeTab === 'wish' ? 'amber' : 'teal'}
+                  className={activeTab === 'bucket' ? 'col-span-2' : ''}
                 />
               </div>
               <input
@@ -651,13 +621,12 @@ export default function WishListPage() {
             </button>
           </div>
           <div className="flex-1 p-3 overflow-y-auto">
-            {diaryText ? (
-              <pre className="text-xs text-[#a0a0b8] leading-relaxed whitespace-pre-wrap font-sans">
-                {diaryText}
-              </pre>
-            ) : (
-              <p className="text-xs text-[#2a2a3a] italic">この日の日記はありません</p>
-            )}
+            <DiaryChecklist
+              date={diaryDate}
+              content={diaryEntry?.content ?? ''}
+              onUpdated={refetchDiary}
+              flushTrigger={diaryFlush}
+            />
           </div>
         </div>
       </div>

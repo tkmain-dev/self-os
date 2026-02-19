@@ -235,6 +235,7 @@
   "description": "詳細仕様...",
   "status": "pending",
   "sort_order": 1,
+  "commit_message": "",
   "created_at": "..."
 }]
 ```
@@ -249,9 +250,11 @@ Feature Request を作成。
 **レスポンス**: `201`
 
 ### PATCH `/api/feature-requests/:id`
-Feature Request を更新。`title`, `description`, `status` を部分更新可能。
+Feature Request を更新。`title`, `description`, `status`, `commit_message` を部分更新可能。
 
 **ステータス値**: `pending` / `in_progress` / `done` / `rejected`
+
+**commit_message**: git push 完了後に `<hash> <subject>` 形式で記録（例: `abc1234 feat: 機能名`）
 
 ### DELETE `/api/feature-requests/:id`
 Feature Request を削除。**レスポンス**: `204`

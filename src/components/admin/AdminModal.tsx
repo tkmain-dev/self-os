@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApi, apiPost, apiPatch, apiDelete } from '../../hooks/useApi'
+import DiaryChecklist from '../DiaryChecklist'
 
 interface FeatureRequest {
   id: number
@@ -7,6 +8,7 @@ interface FeatureRequest {
   description: string
   status: 'pending' | 'in_progress' | 'done' | 'rejected'
   sort_order: number
+  commit_message: string
   created_at: string
 }
 
@@ -42,41 +44,6 @@ function shiftDate(dateStr: string, delta: number) {
 function formatCreatedDate(dateStr: string) {
   const d = new Date(dateStr.replace(' ', 'T'))
   return `${d.getMonth() + 1}/${d.getDate()}`
-}
-
-/** Parse BlockNote JSON content into readable plain text. */
-function parseBlockNoteContent(raw: string): string {
-  if (!raw) return ''
-  try {
-    const blocks = JSON.parse(raw)
-    if (!Array.isArray(blocks)) return raw
-    return blocksToText(blocks, 0).trimEnd()
-  } catch {
-    return raw
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function blocksToText(blocks: any[], depth: number): string {
-  let out = ''
-  const indent = '  '.repeat(depth)
-  for (const block of blocks) {
-    const text = (block.content ?? [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => c.text ?? '')
-      .join('')
-    if (block.type === 'bulletListItem' || block.type === 'numberedListItem') {
-      out += `${indent}・${text}\n`
-    } else if (text) {
-      out += `${indent}${text}\n`
-    } else {
-      out += '\n'
-    }
-    if (block.children?.length) {
-      out += blocksToText(block.children, depth + 1)
-    }
-  }
-  return out
 }
 
 // ── Gear Button ──
@@ -123,14 +90,15 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
   // Diary state
   const [diaryDate, setDiaryDate] = useState(todayStr)
-  const { data: diaryEntry } = useApi<DiaryEntry>(`/api/diary/${diaryDate}`)
+  const { data: diaryEntry, refetch: refetchDiary } = useApi<DiaryEntry>(`/api/diary/${diaryDate}`)
 
   // Completed panel state
   const [selectedCompletedId, setSelectedCompletedId] = useState<number | null>(null)
 
-  const isEditMode = showForm || editingId !== null
+  // Diary flush ref (call before close to save checked items as faded)
+  const diaryFlushRef = useRef<(() => Promise<void>) | null>(null) as React.RefObject<(() => Promise<void>) | null>
 
-  const diaryText = parseBlockNoteContent(diaryEntry?.content ?? '')
+  const isEditMode = showForm || editingId !== null
 
   // Split items into active and completed
   const activeItems = (items ?? []).filter(i => i.status !== 'done' && i.status !== 'rejected')
@@ -139,7 +107,13 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
   const selectedCompleted = completedItems.find(i => i.id === selectedCompletedId) ?? null
 
-  // Entrance animation
+  // Close handler: flush diary BEFORE unmounting, then close
+  const handleClose = useCallback(async () => {
+    await diaryFlushRef.current?.()
+    onClose()
+  }, [onClose])
+
+  // Entrance animation + reset state on close
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => requestAnimationFrame(() => setAnimateIn(true)))
@@ -243,7 +217,7 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
         backdropFilter: animateIn ? 'blur(4px)' : 'blur(0px)',
         transition: 'background-color 0.3s ease, backdrop-filter 0.3s ease',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
       <div
         className="flex gap-4 mx-4 max-h-[80vh]"
@@ -303,9 +277,23 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
             {selectedCompleted && (
               <div className="border-t border-[#2a2a3a] p-3 max-h-[40%] overflow-y-auto shrink-0">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-medium text-[#5a5a6e]">
-                    {selectedCompleted.status === 'done' ? '完了' : '却下'}
-                  </span>
+                  <select
+                    value={selectedCompleted.status}
+                    onChange={e => {
+                      const newStatus = e.target.value as FeatureRequest['status']
+                      handleUpdate(selectedCompleted.id, { status: newStatus })
+                      if (newStatus !== 'done' && newStatus !== 'rejected') {
+                        setSelectedCompletedId(null)
+                      }
+                    }}
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer appearance-none text-center border-0 focus:outline-none focus:ring-1 focus:ring-amber-500/30 ${
+                      (STATUS_OPTIONS.find(s => s.value === selectedCompleted.status) ?? STATUS_OPTIONS[0]).color
+                    }`}
+                  >
+                    {STATUS_OPTIONS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => handleDelete(selectedCompleted.id)}
                     className="text-[10px] text-[#3a3a4e] hover:text-red-400 transition-colors"
@@ -315,10 +303,20 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
                 </div>
                 <p className="text-xs text-[#e4e4ec] font-medium mb-1">{selectedCompleted.title}</p>
                 {selectedCompleted.description && (
-                  <pre className="text-[10px] text-[#5a5a6e] whitespace-pre-wrap font-sans leading-relaxed">
+                  <pre className="text-[10px] text-[#5a5a6e] whitespace-pre-wrap font-sans leading-relaxed mb-2">
                     {selectedCompleted.description}
                   </pre>
                 )}
+                <div className="mt-1 pt-2 border-t border-[#2a2a3a]">
+                  <p className="text-[9px] text-[#3a3a4e] uppercase tracking-widest mb-1">Commit</p>
+                  {selectedCompleted.commit_message ? (
+                    <pre className="text-[10px] text-emerald-500/60 whitespace-pre-wrap font-mono leading-relaxed break-all">
+                      {selectedCompleted.commit_message}
+                    </pre>
+                  ) : (
+                    <p className="text-[10px] text-[#2a2a3a] italic">未記録</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -339,7 +337,7 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
             </svg>
             <h3 className="text-lg font-bold text-[#e4e4ec] tracking-tight flex-1">Feature Requests</h3>
-            <button onClick={onClose} className="text-[#5a5a6e] hover:text-[#e4e4ec] transition-colors text-xl leading-none">&times;</button>
+            <button onClick={handleClose} className="text-[#5a5a6e] hover:text-[#e4e4ec] transition-colors text-xl leading-none">&times;</button>
           </div>
 
           {/* Body */}
@@ -464,13 +462,12 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
             {/* Diary body */}
             <div className="flex-1 p-3 overflow-y-auto">
-              {diaryText ? (
-                <pre className="text-xs text-[#a0a0b8] leading-relaxed whitespace-pre-wrap font-sans">
-                  {diaryText}
-                </pre>
-              ) : (
-                <p className="text-xs text-[#2a2a3a] italic">この日の日記はありません</p>
-              )}
+              <DiaryChecklist
+                date={diaryDate}
+                content={diaryEntry?.content ?? ''}
+                onUpdated={refetchDiary}
+                flushRef={diaryFlushRef}
+              />
             </div>
           </div>
         </div>

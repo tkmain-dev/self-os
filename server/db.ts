@@ -73,6 +73,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'pending'
       CHECK(status IN ('pending', 'in_progress', 'done', 'rejected')),
     sort_order INTEGER NOT NULL DEFAULT 0,
+    commit_message TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 
@@ -90,5 +91,8 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 `);
+
+// Migrations: add columns that may not exist in older DBs
+try { db.exec(`ALTER TABLE feature_requests ADD COLUMN commit_message TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
 
 export default db;

@@ -22,7 +22,19 @@
 
 ### Feature Request ステータス管理
 
-Feature Request のステータスはユーザーの承認なしに変更しない。ユーザーが「完了」と明言するまで `done` にしないこと。
+- Feature Request のステータスはユーザーの承認なしに変更しない。
+- ただし、Feature Request 経由でユーザーが依頼した機能を実装し、ユーザーが承認（「完璧」「完了」「いいです」など肯定的な確認）した場合は、後述の「完了フロー」を実行すること。
+
+### Feature Request 完了フロー（git push 時）
+
+ユーザーから git push の依頼を受けた際、Feature Request に紐づく実装が含まれる場合は以下の順序で処理する:
+
+1. `README.md` / `docs/` を精査・更新する
+2. `git add` → `git commit` → `git push` を実行する
+3. コミットハッシュ（短縮形）とコミットメッセージを取得する
+4. 対象の Feature Request に対して以下を API PATCH で記録する:
+   - `status`: `"done"`
+   - `commit_message`: `"<hash> <subject>"` 形式（例: `abc1234 feat: ダイアリーチェックリスト実装`）
 
 ## プロジェクト概要
 

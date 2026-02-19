@@ -29,13 +29,14 @@ router.patch('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM feature_requests WHERE id = ?').get(req.params.id) as Record<string, unknown>;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
-  const { title, description, status } = req.body;
+  const { title, description, status, commit_message } = req.body;
   db.prepare(
-    'UPDATE feature_requests SET title = ?, description = ?, status = ? WHERE id = ?'
+    'UPDATE feature_requests SET title = ?, description = ?, status = ?, commit_message = ? WHERE id = ?'
   ).run(
     title ?? existing.title,
     description ?? existing.description,
     status ?? existing.status,
+    commit_message ?? existing.commit_message ?? '',
     req.params.id
   );
 

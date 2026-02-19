@@ -71,6 +71,7 @@ erDiagram
         string description
         string status
         int sort_order
+        string commit_message
         string created_at
     }
 
@@ -178,9 +179,11 @@ erDiagram
 | description | TEXT | NOT NULL, DEFAULT '' | 詳細仕様 |
 | status | TEXT | NOT NULL, DEFAULT 'pending' | ステータス |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順（優先順位） |
+| commit_message | TEXT | NOT NULL, DEFAULT '' | 実装コミットのハッシュ＋メッセージ |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
 - **ステータス**: `pending` / `in_progress` / `done` / `rejected`（CHECK 制約）
+- **commit_message**: git push 完了後に `<hash> <subject>` 形式で記録（例: `abc1234 feat: ダイアリーチェックリスト実装`）
 
 ### wish_items（ウィッシュアイテム）
 
