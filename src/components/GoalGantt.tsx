@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApi, apiPost, apiPatch, apiDelete } from '../hooks/useApi'
+import TicketDetailModal from './TicketDetailModal'
 
 // ── Types ──
 interface Goal {
@@ -15,6 +16,7 @@ interface Goal {
   progress: number
   color: string
   memo: string | null
+  note: string | null
   sort_order: number
 }
 
@@ -284,6 +286,7 @@ export default function GoalGantt() {
   const [editId, setEditId] = useState<number | null>(null)
   const [addParentId, setAddParentId] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [detailGoal, setDetailGoal] = useState<Goal | null>(null)
 
   // Row drag & drop state
   const [dragRowId, setDragRowId] = useState<number | null>(null)
@@ -884,7 +887,7 @@ export default function GoalGantt() {
                         <span
                           className={`truncate cursor-pointer hover:text-amber-400 ${node.issue_type === 'epic' ? 'font-bold' : ''} ${node.status === 'done' ? 'line-through text-[#5a5a6e]' : ''}`}
                           title={node.title}
-                          onClick={() => openEdit(node)}>
+                          onClick={() => setDetailGoal(node)}>
                           {node.title}
                         </span>
                       )}
@@ -1130,6 +1133,18 @@ export default function GoalGantt() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Ticket detail modal */}
+      {detailGoal && (
+        <TicketDetailModal
+          key={detailGoal.id}
+          goal={detailGoal}
+          onClose={() => setDetailGoal(null)}
+          onUpdate={() => {
+            refetch()
+          }}
+        />
       )}
     </div>
   )

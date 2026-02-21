@@ -188,6 +188,7 @@
   "progress": 50,
   "color": "amber",
   "memo": "メモ",
+  "note": null,
   "sort_order": 1,
   "created_at": "..."
 }]
@@ -208,16 +209,17 @@
   "start_date": "2024-01-01",
   "end_date": "2024-06-30",
   "color": "amber",
-  "memo": "メモ"
+  "memo": "メモ",
+  "note": null
 }
 ```
-`issue_type`, `status`, `priority`, `category`, `color`, `memo` はオプション（デフォルト値あり）。
+`issue_type`, `status`, `priority`, `category`, `color`, `memo`, `note` はオプション（デフォルト値あり）。
 
 **レスポンス**: `201`
 **副作用**: `parent_id` 指定時、親の期間が自動調整される（`syncParentDates`）
 
 ### PATCH `/api/goals/:id`
-目標を部分更新。指定しないフィールドは既存値を保持。
+目標を部分更新。指定しないフィールドは既存値を保持。`note` フィールドに BlockNote JSON を保存可能。
 
 **副作用**: 更新後、親の期間が自動調整される
 

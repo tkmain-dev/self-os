@@ -73,6 +73,7 @@ erDiagram
         int progress
         string color
         string memo
+        string note
         int sort_order
         string created_at
     }
@@ -186,10 +187,12 @@ erDiagram
 | progress | INTEGER | NOT NULL, DEFAULT 0 | 進捗率（0-100） |
 | color | TEXT | NOT NULL, DEFAULT 'amber' | 表示色 |
 | memo | TEXT | NULL | メモ |
+| note | TEXT | NULL | ノート（BlockNote JSON） |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
 - **階層構造**: `parent_id` による自己参照で Epic > Story > Task > Subtask の4階層を表現
+- **ノート**: BlockNote リッチテキストエディタの JSON 形式で保存。進捗メモや詳細記録に使用
 - **期間伝播**: 子の期間変更時、`syncParentDates` により親の期間が自動調整される
 - **カスケード削除**: 親目標の削除時に子目標も自動削除
 
