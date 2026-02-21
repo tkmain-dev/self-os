@@ -173,14 +173,26 @@ type ViewRange = '1m' | '3m' | '6m' | '1y'
 
 function getViewDates(range: ViewRange, offset: number) {
   const today = new Date()
-  today.setDate(1)
-  today.setMonth(today.getMonth() + offset)
-  const start = formatDate(today)
   const months = range === '1m' ? 1 : range === '3m' ? 3 : range === '6m' ? 6 : 12
-  const end = new Date(today)
-  end.setMonth(end.getMonth() + months)
-  end.setDate(end.getDate() - 1)
-  return { start, end: formatDate(end), days: diffDays(start, formatDate(end)) + 1 }
+
+  // 左マージン: 範囲の約20%を過去分として確保（今日が左端に張り付かない）
+  const leftMarginDays = Math.round(months * 30 * 0.2)
+
+  // 起点 = 今日 - 左マージン + offset（日数ベース）
+  const startDate = new Date(today)
+  startDate.setDate(startDate.getDate() - leftMarginDays + offset)
+  const start = formatDate(startDate)
+
+  // 終点 = 起点 + N ヶ月
+  const endDate = new Date(startDate)
+  endDate.setMonth(endDate.getMonth() + months)
+  endDate.setDate(endDate.getDate() - 1)
+
+  return { start, end: formatDate(endDate), days: diffDays(start, formatDate(endDate)) + 1 }
+}
+
+function getNavStep(range: ViewRange): number {
+  return range === '1m' ? 7 : range === '1y' ? 90 : 30
 }
 
 // ── Tree builder ──
@@ -671,9 +683,9 @@ export default function GoalGantt() {
           ))}
         </div>
         <div className="flex gap-1">
-          <button onClick={() => setOffset(o => o - 1)} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&larr;</button>
-          <button onClick={() => setOffset(0)} className="px-2 py-1 bg-[#1e1e2a] text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/10 text-xs transition-colors">今月</button>
-          <button onClick={() => setOffset(o => o + 1)} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&rarr;</button>
+          <button onClick={() => setOffset(o => o - getNavStep(viewRange))} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&larr;</button>
+          <button onClick={() => setOffset(0)} className="px-2 py-1 bg-[#1e1e2a] text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/10 text-xs transition-colors">今日</button>
+          <button onClick={() => setOffset(o => o + getNavStep(viewRange))} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&rarr;</button>
         </div>
         {selected.size > 0 && (
           <button onClick={handleBulkDelete}
