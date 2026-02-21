@@ -112,6 +112,12 @@ WBS ベースのガントチャートで目標を階層管理する。最も複�
 
 月・週・日の3ビューカレンダー。スケジュールと目標を統合表示。
 
+- **目標バンド**: 葉タスク（子を持たないタスク）のみをフラット表示。親タスクの帯は非表示
+  - Epic 祖先がある場合: 紫の角丸バッジ `[Epic名]` をプレフィックス表示
+  - Story 祖先がある場合: `Story名 /` を薄い色でプレフィックス表示
+  - Task/Subtask 親は非表示（Epic・Story のみ表示）
+  - ホバー時のツールチップには `Epic / Story / タスク名` のフルパスを表示
+
 | ファイル | 役割 |
 |---------|------|
 | `CalendarPage.tsx` | メイン。データ取得、ビュー切替、モーダル管理 |
@@ -124,8 +130,8 @@ WBS ベースのガントチャートで目標を階層管理する。最も複�
 | `CalendarEventItem.tsx` | スケジュールイベント表示 |
 | `CalendarGoalItem.tsx` | 目標バンド表示 |
 | `CalendarFormModal.tsx` | スケジュール作成・編集モーダル |
-| `calendarTypes.ts` | 型定義（ScheduleItem, GoalItem, CalendarEvent, BandSegment） |
-| `calendarUtils.ts` | ユーティリティ関数 |
+| `calendarTypes.ts` | 型定義（ScheduleItem, GoalItem, CalendarEvent, BandSegment（epicTitle/storyTitle付き）） |
+| `calendarUtils.ts` | ユーティリティ関数（collectLeaves で葉タスク抽出 + Epic/Story 祖先情報） |
 
 ### WishListPage.tsx
 

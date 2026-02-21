@@ -7,8 +7,6 @@ export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 // ── Band layout constants ──
 const LEAF_HEIGHT = 20      // px for leaf nodes (task/subtask with text)
-const NEST_PAD_TOP = 13     // px top padding inside parent (room for title text)
-const NEST_PAD_BOTTOM = 2   // px bottom padding inside parent
 const BAND_GAP = 2          // px gap between sibling bands
 const EDGE_INSET = 0.5      // % inset from cell edges for soft boundaries
 
@@ -180,116 +178,94 @@ function assignLanes(nodes: GoalTreeNode[]): { laneMap: Map<number, number>; num
 }
 
 /**
- * Calculate the pixel height a tree node needs (including all descendants).
- * Optionally scoped to a date range so only visible children are considered.
+ * Collect leaf nodes (no children) from the goal tree with Epic/Story ancestor context.
+ * Task/Subtask parents are ignored — only Epic and Story ancestors are tracked.
  */
-export function calcNodeHeight(node: GoalTreeNode, weekStart?: string, weekEnd?: string): number {
-  if (node.children.length === 0) return LEAF_HEIGHT
-  const children = (weekStart && weekEnd)
-    ? node.children.filter(c => c.goal.start_date <= weekEnd && c.goal.end_date >= weekStart)
-    : node.children
-  if (children.length === 0) return LEAF_HEIGHT
-  const { laneMap, numLanes } = assignLanes(children)
-  const laneHeights = new Array(numLanes).fill(0)
-  for (const child of children) {
-    const lane = laneMap.get(child.goal.id)!
-    laneHeights[lane] = Math.max(laneHeights[lane], calcNodeHeight(child, weekStart, weekEnd))
+export function collectLeaves(
+  nodes: GoalTreeNode[],
+  epicTitle: string | null = null,
+  storyTitle: string | null = null,
+): { node: GoalTreeNode; epicTitle: string | null; storyTitle: string | null }[] {
+  const leaves: { node: GoalTreeNode; epicTitle: string | null; storyTitle: string | null }[] = []
+  for (const n of nodes) {
+    if (n.children.length === 0) {
+      leaves.push({ node: n, epicTitle, storyTitle })
+    } else {
+      const nextEpic = n.goal.issue_type === 'epic' ? n.goal.title : epicTitle
+      const nextStory = n.goal.issue_type === 'story' ? n.goal.title : storyTitle
+      leaves.push(...collectLeaves(n.children, nextEpic, nextStory))
+    }
   }
-  let total = NEST_PAD_TOP + NEST_PAD_BOTTOM
-  for (let i = 0; i < numLanes; i++) {
-    if (i > 0) total += BAND_GAP
-    total += laneHeights[i]
-  }
-  return Math.max(LEAF_HEIGHT, total)
+  return leaves
 }
 
 /**
- * Layout goal tree nodes as positioned band segments for a given week.
- * Returns flat list of BandSegment with absolute positions.
+ * Layout leaf-only goal bands for a given week.
+ * Returns flat list of BandSegment with absolute positions (no nesting).
  */
 export function layoutWeekBands(
   roots: GoalTreeNode[],
   weekStart: string,
   weekEnd: string,
 ): BandSegment[] {
-  const segments: BandSegment[] = []
+  const allLeaves = collectLeaves(roots)
+  const visible = allLeaves.filter(({ node }) =>
+    node.goal.start_date <= weekEnd && node.goal.end_date >= weekStart
+  )
+  if (visible.length === 0) return []
 
-  function layoutLevel(nodes: GoalTreeNode[], topOffset: number) {
-    const visible = nodes.filter(n =>
-      n.goal.start_date <= weekEnd && n.goal.end_date >= weekStart
-    )
-    if (visible.length === 0) return
+  const visibleNodes = visible.map(v => v.node)
+  const { laneMap, numLanes } = assignLanes(visibleNodes)
 
-    const { laneMap, numLanes } = assignLanes(visible)
-
-    const laneHeights = new Array(numLanes).fill(0)
-    for (const node of visible) {
-      const lane = laneMap.get(node.goal.id)!
-      laneHeights[lane] = Math.max(laneHeights[lane], calcNodeHeight(node, weekStart, weekEnd))
-    }
-
-    const laneY: number[] = []
-    let y = topOffset
-    for (let i = 0; i < numLanes; i++) {
-      laneY.push(y)
-      y += laneHeights[i] + BAND_GAP
-    }
-
-    for (const node of visible) {
-      const g = node.goal
-      const lane = laneMap.get(g.id)!
-      const nodeY = laneY[lane]
-      const height = calcNodeHeight(node, weekStart, weekEnd)
-
-      const colStart = Math.max(0, diffDays(weekStart, g.start_date))
-      const colEnd = Math.min(6, diffDays(weekStart, g.end_date))
-
-      const left = (colStart / 7) * 100 + EDGE_INSET
-      const width = ((colEnd - colStart + 1) / 7) * 100 - EDGE_INSET * 2
-
-      segments.push({
-        id: g.id,
-        left,
-        width: Math.max(width, 2),
-        top: nodeY,
-        height,
-        depth: node.depth,
-        issueType: g.issue_type,
-        title: g.title,
-        hasChildren: node.children.length > 0,
-        goal: g,
-      })
-
-      if (node.children.length > 0) {
-        layoutLevel(node.children, nodeY + NEST_PAD_TOP)
-      }
-    }
+  const laneY: number[] = []
+  let y = 0
+  for (let i = 0; i < numLanes; i++) {
+    laneY.push(y)
+    y += LEAF_HEIGHT + BAND_GAP
   }
 
-  layoutLevel(roots, 0)
+  const segments: BandSegment[] = []
+  for (const { node, epicTitle, storyTitle } of visible) {
+    const g = node.goal
+    const lane = laneMap.get(g.id)!
+
+    const colStart = Math.max(0, diffDays(weekStart, g.start_date))
+    const colEnd = Math.min(6, diffDays(weekStart, g.end_date))
+
+    const left = (colStart / 7) * 100 + EDGE_INSET
+    const width = ((colEnd - colStart + 1) / 7) * 100 - EDGE_INSET * 2
+
+    segments.push({
+      id: g.id,
+      left,
+      width: Math.max(width, 2),
+      top: laneY[lane],
+      height: LEAF_HEIGHT,
+      depth: node.depth,
+      issueType: g.issue_type,
+      title: g.title,
+      hasChildren: false,
+      epicTitle,
+      storyTitle,
+      goal: g,
+    })
+  }
+
   return segments
 }
 
 /**
- * Calculate total height of the band overlay area for a week.
+ * Calculate total height of the leaf-only band overlay area for a week.
  */
 export function calcWeekBandsHeight(roots: GoalTreeNode[], weekStart: string, weekEnd: string): number {
-  const visible = roots.filter(r =>
-    r.goal.start_date <= weekEnd && r.goal.end_date >= weekStart
+  const allLeaves = collectLeaves(roots)
+  const visible = allLeaves.filter(({ node }) =>
+    node.goal.start_date <= weekEnd && node.goal.end_date >= weekStart
   )
   if (visible.length === 0) return 0
 
-  const { laneMap, numLanes } = assignLanes(visible)
-  const laneHeights = new Array(numLanes).fill(0)
-  for (const node of visible) {
-    const lane = laneMap.get(node.goal.id)!
-    laneHeights[lane] = Math.max(laneHeights[lane], calcNodeHeight(node, weekStart, weekEnd))
-  }
+  const visibleNodes = visible.map(v => v.node)
+  const { numLanes } = assignLanes(visibleNodes)
 
-  let total = 0
-  for (let i = 0; i < numLanes; i++) {
-    if (i > 0) total += BAND_GAP
-    total += laneHeights[i]
-  }
-  return total
+  return numLanes * LEAF_HEIGHT + (numLanes - 1) * BAND_GAP
 }

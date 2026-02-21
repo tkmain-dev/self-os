@@ -46,7 +46,7 @@ export interface CalendarEvent {
   original: ScheduleItem | GoalItem
 }
 
-// Positioned band segment for rendering nested goal bars
+// Positioned band segment for rendering leaf-only goal bars
 export interface BandSegment {
   id: number
   left: number   // percentage 0-100
@@ -57,5 +57,7 @@ export interface BandSegment {
   issueType: string
   title: string
   hasChildren: boolean
+  epicTitle: string | null   // 祖先Epicのタイトル
+  storyTitle: string | null  // 祖先Storyのタイトル
   goal: GoalItem
 }

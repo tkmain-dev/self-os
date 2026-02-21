@@ -14,22 +14,6 @@ interface CalendarWeekViewProps {
   onEventClick: (event: CalendarEvent) => void
 }
 
-// Depth-based styles (same as MonthView)
-const BAND_STYLES: Record<number, { bg: string; border: string; text: string; textSize: string }> = {
-  0: {
-    bg: 'bg-violet-500/[0.04]',
-    border: 'border border-violet-500/[0.10]',
-    text: 'text-violet-400/30',
-    textSize: 'text-[8px]',
-  },
-  1: {
-    bg: 'bg-emerald-500/[0.08]',
-    border: 'border border-emerald-500/[0.14]',
-    text: 'text-emerald-400/40',
-    textSize: 'text-[9px]',
-  },
-}
-
 const LEAF_STYLE: Record<string, { bg: string; borderColor: string; text: string }> = {
   task:    { bg: 'bg-sky-500/20', borderColor: 'border-l-[3px] border-sky-500', text: 'text-sky-300' },
   subtask: { bg: 'bg-slate-500/20', borderColor: 'border-l-[3px] border-slate-400', text: 'text-slate-300' },
@@ -38,33 +22,11 @@ const LEAF_STYLE: Record<string, { bg: string; borderColor: string; text: string
 }
 
 function BandRenderer({ segment, onEventClick }: { segment: BandSegment; onEventClick: (g: GoalItem) => void }) {
-  const isLeaf = !segment.hasChildren
-
-  if (isLeaf) {
-    const style = LEAF_STYLE[segment.issueType] ?? LEAF_STYLE.task
-    return (
-      <div
-        className={`absolute ${style.bg} ${style.borderColor} rounded flex items-center cursor-pointer hover:brightness-125 transition-all overflow-hidden`}
-        style={{
-          left: `${segment.left}%`,
-          width: `${segment.width}%`,
-          top: `${segment.top}px`,
-          height: `${segment.height}px`,
-        }}
-        onClick={(e) => { e.stopPropagation(); onEventClick(segment.goal) }}
-        title={segment.title}
-      >
-        <span className={`text-[10px] font-medium px-1.5 truncate ${style.text}`}>
-          {segment.title}
-        </span>
-      </div>
-    )
-  }
-
-  const depthStyle = BAND_STYLES[segment.depth] ?? BAND_STYLES[1]
+  const style = LEAF_STYLE[segment.issueType] ?? LEAF_STYLE.task
+  const tooltipParts = [segment.epicTitle, segment.storyTitle, segment.title].filter(Boolean)
   return (
     <div
-      className={`absolute ${depthStyle.bg} ${depthStyle.border} rounded-md cursor-pointer hover:brightness-110 transition-all overflow-hidden`}
+      className={`absolute ${style.bg} ${style.borderColor} rounded flex items-center cursor-pointer hover:brightness-125 transition-all overflow-hidden`}
       style={{
         left: `${segment.left}%`,
         width: `${segment.width}%`,
@@ -72,12 +34,12 @@ function BandRenderer({ segment, onEventClick }: { segment: BandSegment; onEvent
         height: `${segment.height}px`,
       }}
       onClick={(e) => { e.stopPropagation(); onEventClick(segment.goal) }}
-      title={segment.title}
+      title={tooltipParts.join(' / ')}
     >
-      <span className={`absolute top-0 left-1 ${depthStyle.textSize} ${depthStyle.text} truncate pointer-events-none`}
-        style={{ maxWidth: '90%' }}
-      >
-        {segment.title}
+      <span className={`text-[10px] font-medium px-1.5 truncate ${style.text} flex items-center gap-1`}>
+        {segment.epicTitle && <span className="text-[8px] px-1 py-px rounded bg-violet-500/20 text-violet-400/70 shrink-0">{segment.epicTitle}</span>}
+        {segment.storyTitle && <span className="opacity-50 shrink-0">{segment.storyTitle} /</span>}
+        <span className="truncate">{segment.title}</span>
       </span>
     </div>
   )
