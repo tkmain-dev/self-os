@@ -148,6 +148,7 @@ export default function WishListPage() {
   const [error, setError] = useState('')
   const [dragId, setDragId] = useState<number | null>(null)
   const [dragOverId, setDragOverId] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
 
   // Diary state
@@ -463,6 +464,8 @@ export default function WishListPage() {
             const dl = daysUntil(item.deadline)
             const isDragging = dragId === item.id
             const isDragOver = dragOverId === item.id
+            const isExpanded = expandedId === item.id
+            const hasDetails = !!(item.memo || item.url || item.deadline)
 
             return (
               <div
@@ -472,16 +475,25 @@ export default function WishListPage() {
                 onDragOver={e => handleDragOver(e, item.id)}
                 onDragEnd={() => { setDragId(null); setDragOverId(null) }}
                 onDrop={e => handleDrop(e, item.id)}
-                className={`group relative ${theme.cardBg} border ${theme.leftAccent} ${theme.cardRadius} p-4 transition-all duration-200 ${
+                onClick={() => { if (!isDragging) setExpandedId(isExpanded ? null : item.id) }}
+                className={`group relative ${theme.cardBg} border ${theme.leftAccent} ${theme.cardRadius} transition-all duration-300 cursor-pointer ${
                   isDragging ? 'opacity-40 scale-[0.98]' : ''
-                } ${isDragOver ? theme.cardDragOver : theme.cardBorder} ${
+                } ${isDragOver ? theme.cardDragOver : isExpanded
+                  ? activeTab === 'wish'
+                    ? 'border-amber-500/30 shadow-lg shadow-amber-500/5'
+                    : 'border-teal-500/30 shadow-lg shadow-teal-500/5'
+                  : theme.cardBorder
+                } ${
                   item.done ? 'opacity-50' : theme.cardHover
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <span className={`cursor-grab active:cursor-grabbing ${theme.gripColor} mt-0.5 select-none transition-colors`}>⠿</span>
+                <div className="flex items-start gap-3 p-4">
+                  <span
+                    className={`cursor-grab active:cursor-grabbing ${theme.gripColor} mt-0.5 select-none transition-colors`}
+                    onClick={e => e.stopPropagation()}
+                  >⠿</span>
                   <button
-                    onClick={() => handleToggleDone(item)}
+                    onClick={e => { e.stopPropagation(); handleToggleDone(item) }}
                     className={`mt-0.5 w-4.5 h-4.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
                       item.done
                         ? `${theme.checkDone} text-black`
@@ -501,63 +513,138 @@ export default function WishListPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      {item.url && (
-                        <a
-                          href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-400/70 hover:text-blue-400 transition-colors truncate max-w-[200px]"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {extractDomain(item.url)}
-                        </a>
-                      )}
-                      {dl && (
-                        <span className={`text-xs ${dl.urgent ? 'text-red-400' : 'text-[#5a5a6e]'}`}>
-                          {dl.text}
-                        </span>
-                      )}
-                      {item.memo && (
-                        <span className="text-xs text-[#5a5a6e] truncate max-w-[200px]">{item.memo}</span>
-                      )}
-                    </div>
+                    {!isExpanded && (
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        {item.url && (
+                          <span className="text-xs text-blue-400/70 truncate max-w-[200px]">
+                            {extractDomain(item.url)}
+                          </span>
+                        )}
+                        {dl && (
+                          <span className={`text-xs ${dl.urgent ? 'text-red-400' : 'text-[#5a5a6e]'}`}>
+                            {dl.text}
+                          </span>
+                        )}
+                        {item.memo && (
+                          <span className="text-xs text-[#5a5a6e] truncate max-w-[200px]">{item.memo}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Ticket button (bucket only, not done) */}
-                    {activeTab === 'bucket' && !item.done && (
+                  <div className="flex items-center gap-1">
+                    {hasDetails && (
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${
+                        isExpanded
+                          ? activeTab === 'wish' ? 'text-amber-400/70' : 'text-teal-400/70'
+                          : 'text-[#3a3a4e] group-hover:text-[#5a5a6e]'
+                      }`}>
+                        <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className={`flex items-center gap-1 transition-opacity ${isExpanded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                      {activeTab === 'bucket' && !item.done && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setTicketItem(item) }}
+                          className="p-1.5 text-[#5a5a6e] hover:text-violet-400 transition-colors"
+                          title="チケット化"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                            <path d="M16 3v4M8 3v4" />
+                            <path d="M2 12h20" />
+                          </svg>
+                        </button>
+                      )}
                       <button
-                        onClick={() => setTicketItem(item)}
-                        className="p-1.5 text-[#5a5a6e] hover:text-violet-400 transition-colors"
-                        title="チケット化"
+                        onClick={e => { e.stopPropagation(); startEdit(item) }}
+                        className={`p-1.5 text-[#5a5a6e] ${activeTab === 'wish' ? 'hover:text-amber-500' : 'hover:text-teal-400'} transition-colors`}
+                        title="編集"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                          <path d="M16 3v4M8 3v4" />
-                          <path d="M2 12h20" />
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
-                    )}
-                    <button
-                      onClick={() => startEdit(item)}
-                      className={`p-1.5 text-[#5a5a6e] ${activeTab === 'wish' ? 'hover:text-amber-500' : 'hover:text-teal-400'} transition-colors`}
-                      title="編集"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1.5 text-[#5a5a6e] hover:text-red-400 transition-colors"
-                      title="削除"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDelete(item.id) }}
+                        className="p-1.5 text-[#5a5a6e] hover:text-red-400 transition-colors"
+                        title="削除"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded detail panel */}
+                <div className={`overflow-hidden transition-all duration-300 ease-out ${
+                  isExpanded ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
+                }`}>
+                  <div className={`px-4 pb-4 pt-0 border-t ${
+                    activeTab === 'wish' ? 'border-amber-500/10' : 'border-teal-500/10'
+                  }`}>
+                    <div className="pt-3 space-y-2.5">
+                      {/* URL */}
+                      {item.url && (
+                        <div className="flex items-center gap-2">
+                          <svg className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'wish' ? 'text-amber-500/40' : 'text-teal-500/40'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                          </svg>
+                          <a
+                            href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-400/80 hover:text-blue-400 transition-colors truncate"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {item.url}
+                          </a>
+                        </div>
+                      )}
+                      {/* Deadline */}
+                      {item.deadline && (
+                        <div className="flex items-center gap-2">
+                          <svg className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'wish' ? 'text-amber-500/40' : 'text-teal-500/40'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                          </svg>
+                          <span className="text-xs text-[#8b8b9e]">{item.deadline}</span>
+                          {dl && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                              dl.urgent
+                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                : activeTab === 'wish'
+                                  ? 'bg-amber-500/10 text-amber-400/70 border border-amber-500/15'
+                                  : 'bg-teal-500/10 text-teal-400/70 border border-teal-500/15'
+                            }`}>
+                              {dl.text}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {/* Price detail (wish only) */}
+                      {item.price !== null && activeTab === 'wish' && (
+                        <div className="flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5 shrink-0 text-amber-500/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                          <span className="text-xs text-amber-400/80 font-medium">{formatPrice(item.price)}</span>
+                        </div>
+                      )}
+                      {/* Memo */}
+                      {item.memo && (
+                        <div className="flex items-start gap-2 mt-1">
+                          <svg className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${activeTab === 'wish' ? 'text-amber-500/40' : 'text-teal-500/40'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                          </svg>
+                          <p className="text-xs text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">{item.memo}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
