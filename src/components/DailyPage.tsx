@@ -99,6 +99,8 @@ export default function DailyPage() {
         <MonthlyGoalBadge />
       </div>
 
+      <WeeklyGoalSection />
+
       {/* Two-column layout – stacks on narrow, side-by-side on wide */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left: Timeline */}
@@ -1105,6 +1107,185 @@ function MonthlyGoalBadge() {
       >
         ✎
       </button>
+    </div>
+  )
+}
+
+
+// ══════════════════════════════════════
+// Weekly Goal Section
+// ══════════════════════════════════════
+function getISOWeekString(d: Date): string {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  const weekNo = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
+}
+
+function getWeekRange(d: Date): { start: Date; end: Date } {
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const start = new Date(d)
+  start.setDate(d.getDate() + diff)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { start, end }
+}
+
+function WeeklyGoalSection() {
+  const now = new Date()
+  const yearWeek = getISOWeekString(now)
+  const { start, end } = getWeekRange(now)
+  const weekLabel = `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`
+
+  const [content, setContent] = useState('')
+  const [memo, setMemo] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [draftMemo, setDraftMemo] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const memoRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    fetch(`/api/weekly-goals/${yearWeek}`)
+      .then(r => r.json())
+      .then(d => { setContent(d.content ?? ''); setMemo(d.memo ?? null) })
+  }, [yearWeek])
+
+  const startEdit = () => {
+    setDraft(content)
+    setDraftMemo(memo ?? '')
+    setEditing(true)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const save = async () => {
+    const trimmedContent = draft.trim()
+    const trimmedMemo = draftMemo.trim() || null
+    await apiPut(`/api/weekly-goals/${yearWeek}`, { content: trimmedContent, memo: trimmedMemo })
+    setContent(trimmedContent)
+    setMemo(trimmedMemo)
+    setEditing(false)
+  }
+
+  const cancel = () => {
+    setEditing(false)
+    setDraft('')
+    setDraftMemo('')
+  }
+
+  if (editing) {
+    return (
+      <div className="mb-4 rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 via-[#1a1a2e] to-[#1a1a2e] overflow-hidden">
+        <div className="px-4 py-3 space-y-3">
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-amber-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+            </svg>
+            <span className="text-[10px] text-amber-500/40 font-mono tracking-widest uppercase">WEEK {yearWeek.split('-W')[1]}</span>
+            <span className="text-[10px] text-[#3a3a4e]">{weekLabel}</span>
+            <div className="ml-auto flex gap-1.5">
+              <button onClick={save} className="px-2.5 py-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 rounded-md transition-colors">保存</button>
+              <button onClick={cancel} className="px-2.5 py-1 text-xs text-[#5a5a6e] hover:text-[#8b8b9e] bg-[#1e1e2a] hover:bg-[#252535] rounded-md transition-colors">取消</button>
+            </div>
+          </div>
+          {/* Goal input */}
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') cancel() }}
+            placeholder="今週の目標..."
+            className="w-full bg-transparent border-b border-amber-500/30 focus:border-amber-400 text-sm font-semibold tracking-tight text-amber-200 outline-none py-1 placeholder:text-amber-500/20 placeholder:font-normal"
+          />
+          {/* Memo textarea */}
+          <div>
+            <label className="text-[10px] text-[#5a5a6e] mb-1 block">詳細・理由</label>
+            <textarea
+              ref={memoRef}
+              value={draftMemo}
+              onChange={e => setDraftMemo(e.target.value)}
+              placeholder="なぜこの目標か、具体的に何をするか..."
+              rows={3}
+              className="w-full bg-[#12121c] border border-[#2a2a3a] focus:border-amber-500/30 rounded-lg text-xs text-[#b0b0c0] outline-none px-3 py-2 resize-none placeholder:text-[#3a3a4e]"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4">
+      <div
+        className={`rounded-xl border transition-all duration-300 ${
+          expanded
+            ? 'border-amber-500/25 bg-gradient-to-r from-amber-500/8 via-[#1a1a2e] to-[#1a1a2e] shadow-lg shadow-amber-500/5'
+            : 'border-[#2a2a3a] bg-[#16161e] hover:border-amber-500/15'
+        }`}
+      >
+        {/* Goal bar */}
+        <div className="flex items-center gap-3 px-4 py-2.5 group">
+          <svg className="w-4 h-4 text-amber-400/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+          </svg>
+          <span className="text-[10px] text-amber-500/35 font-mono tracking-widest uppercase shrink-0">W{yearWeek.split('-W')[1]}</span>
+          {content ? (
+            <span className="text-sm font-semibold tracking-tight text-amber-300/80 truncate min-w-0 select-none">
+              {content}
+            </span>
+          ) : (
+            <span className="text-sm text-[#3a3a4e] italic truncate select-none">
+              今週の目標を設定...
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            {memo && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
+                  expanded
+                    ? 'bg-amber-500/20 text-amber-300 shadow-sm shadow-amber-500/10'
+                    : 'text-amber-400/30 hover:text-amber-400/70 hover:bg-amber-500/10'
+                }`}
+                title="詳細を表示"
+              >
+                <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={startEdit}
+              className="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 text-amber-500/40 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+              title="今週の目標を編集"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Expandable detail panel */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            expanded ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="px-4 pb-3">
+            <div className="border-t border-amber-500/10 pt-3">
+              <div className="flex items-start gap-2">
+                <div className="w-0.5 h-full min-h-[20px] bg-gradient-to-b from-amber-400/40 to-amber-400/0 rounded-full shrink-0 mt-0.5" />
+                <div className="text-xs text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">{memo}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -101,6 +101,14 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 
+  CREATE TABLE IF NOT EXISTS weekly_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_week TEXT NOT NULL UNIQUE,
+    content TEXT NOT NULL DEFAULT '',
+    memo TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
   CREATE TABLE IF NOT EXISTS routines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

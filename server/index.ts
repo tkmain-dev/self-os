@@ -9,6 +9,7 @@ import featureRequestsRouter from './routes/featureRequests';
 import wishItemsRouter from './routes/wishItems';
 import monthlyGoalsRouter from './routes/monthlyGoals';
 import routinesRouter from './routes/routines';
+import weeklyGoalsRouter from './routes/weeklyGoals';
 
 const app = express();
 const PORT = 3001;
@@ -25,6 +26,7 @@ app.use('/api/feature-requests', featureRequestsRouter);
 app.use('/api/wish-items', wishItemsRouter);
 app.use('/api/monthly-goals', monthlyGoalsRouter);
 app.use('/api/routines', routinesRouter);
+app.use('/api/weekly-goals', weeklyGoalsRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
