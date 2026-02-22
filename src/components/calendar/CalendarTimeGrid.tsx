@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import type { CalendarEvent, RoutineItem } from './calendarTypes'
 import CalendarEventItem from './CalendarEventItem'
 
@@ -87,6 +87,7 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
   const showNowLine = nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60
 
   return (
+    <>
     <div
       ref={containerRef}
       className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-auto"
@@ -182,31 +183,33 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
                   const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
                   const height = ((endMin - startMin) / 60) * HOUR_HEIGHT
                   return (
-                    <div
-                      key={`routine-${routine.id}`}
-                      className="absolute left-0 right-0 z-[1] pointer-events-none mx-0.5"
-                      style={{ top: `${top}px`, height: `${height}px` }}
-                    >
-                      <div className="h-full rounded-sm border border-dashed border-teal-500/20 bg-teal-500/5 relative">
-                        <span className="text-[8px] text-teal-400/25 font-medium px-1 pt-px block truncate select-none">
-                          {routine.name}
-                        </span>
-                        {routine.memo && (
-                          <button
-                            className="absolute top-px right-0.5 pointer-events-auto w-3.5 h-3.5 flex items-center justify-center rounded-full bg-teal-500/10 hover:bg-teal-500/30 text-teal-400/40 hover:text-teal-300 transition-all"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                              setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.right + 6, y: rect.top })
-                            }}
-                          >
-                            <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                            </svg>
-                          </button>
-                        )}
+                    <React.Fragment key={`routine-${routine.id}`}>
+                      <div
+                        className="absolute left-0 right-0 z-[1] pointer-events-none mx-0.5"
+                        style={{ top: `${top}px`, height: `${height}px` }}
+                      >
+                        <div className="h-full rounded-sm border border-dashed border-teal-500/20 bg-teal-500/5">
+                          <span className="text-[8px] text-teal-400/25 font-medium px-1 pt-px block truncate select-none">
+                            {routine.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                      {routine.memo && (
+                        <button
+                          className="absolute z-[25] right-1 w-4 h-4 flex items-center justify-center rounded-full bg-teal-500/15 hover:bg-teal-500/40 text-teal-400/50 hover:text-teal-300 transition-all shadow-sm hover:shadow-teal-500/20"
+                          style={{ top: `${top + 1}px` }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.left, y: rect.bottom + 4 })
+                          }}
+                        >
+                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                          </svg>
+                        </button>
+                      )}
+                    </React.Fragment>
                   )
                 })}
 
@@ -245,22 +248,24 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
         })}
       </div>
 
-      {/* Routine popover */}
+      </div>
+
+      {/* Routine popover — rendered outside overflow-auto container */}
       {routinePopover && (() => {
         const routine = (routines ?? []).find(r => r.id === routinePopover.id)
         if (!routine?.memo) return null
         return (
           <>
             <div
-              className="fixed inset-0 z-[39]"
+              className="fixed inset-0 z-40"
               onClick={() => setRoutinePopover(null)}
             />
             <div
-              className="fixed z-40 w-52"
+              className="fixed z-50 w-52"
               style={{ top: `${routinePopover.y}px`, left: `${routinePopover.x}px` }}
             >
-              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-xl shadow-teal-500/5 overflow-hidden">
-                <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2">
+              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm">
+                <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2 bg-teal-500/5">
                   <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
                   <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
                   <span className="text-[8px] text-teal-400/40 font-mono ml-auto shrink-0">
@@ -277,6 +282,6 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
           </>
         )
       })()}
-    </div>
+    </>
   )
 }

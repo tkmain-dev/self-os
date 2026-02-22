@@ -416,70 +416,35 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
               const topPx = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
               const heightPx = ((endMin - startMin) / 60) * HOUR_HEIGHT
               return (
-                <div
-                  key={`routine-${routine.id}`}
-                  className="absolute left-11 right-0 z-[1] pointer-events-none"
-                  style={{ top: `${topPx}px`, height: `${heightPx}px` }}
-                >
-                  <div className="h-full mx-0.5 rounded-md border border-dashed border-teal-500/20 bg-teal-500/5 relative group/routine">
-                    <span className="text-[9px] text-teal-400/30 font-medium px-2 pt-0.5 block truncate select-none">
-                      {routine.name}
-                    </span>
-                    {routine.memo && (
-                      <button
-                        className="absolute top-0.5 right-1 pointer-events-auto w-4 h-4 flex items-center justify-center rounded-full bg-teal-500/10 hover:bg-teal-500/30 text-teal-400/40 hover:text-teal-300 transition-all text-[8px]"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                          setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.right + 8, y: rect.top })
-                        }}
-                      >
-                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Routine popover */}
-            {routinePopover && (() => {
-              const routine = routines.find(r => r.id === routinePopover.id)
-              if (!routine?.memo) return null
-              const timelineRect = timelineRef.current?.getBoundingClientRect()
-              if (!timelineRect) return null
-              const popoverTop = routinePopover.y - timelineRect.top
-              const popoverLeft = routinePopover.x - timelineRect.left
-              return (
-                <>
+                <React.Fragment key={`routine-${routine.id}`}>
                   <div
-                    className="fixed inset-0 z-[29]"
-                    onClick={() => setRoutinePopover(null)}
-                  />
-                  <div
-                    className="absolute z-30 w-56 animate-in fade-in"
-                    style={{ top: `${popoverTop}px`, left: `${popoverLeft}px` }}
+                    className="absolute left-11 right-0 z-[1] pointer-events-none"
+                    style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                   >
-                    <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-xl shadow-teal-500/5 overflow-hidden">
-                      <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
-                        <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
-                        <span className="text-[9px] text-teal-400/40 font-mono ml-auto shrink-0">
-                          {routine.start_time}-{routine.end_time}
-                        </span>
-                      </div>
-                      <div className="px-3 py-2.5">
-                        <div className="text-[11px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
-                          {routine.memo}
-                        </div>
-                      </div>
+                    <div className="h-full mx-0.5 rounded-md border border-dashed border-teal-500/20 bg-teal-500/5">
+                      <span className="text-[9px] text-teal-400/30 font-medium px-2 pt-0.5 block truncate select-none">
+                        {routine.name}
+                      </span>
                     </div>
                   </div>
-                </>
+                  {routine.memo && (
+                    <button
+                      className="absolute z-[25] right-2 w-5 h-5 flex items-center justify-center rounded-full bg-teal-500/15 hover:bg-teal-500/40 text-teal-400/50 hover:text-teal-300 transition-all shadow-sm hover:shadow-teal-500/20"
+                      style={{ top: `${topPx + 2}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                        setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.left, y: rect.bottom + 6 })
+                      }}
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                      </svg>
+                    </button>
+                  )}
+                </React.Fragment>
               )
-            })()}
+            })}
 
             {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes <= END_HOUR * 60 && (
               <div className="absolute left-11 right-0 z-20 flex items-center pointer-events-none"
@@ -544,6 +509,39 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
           </div>
         </div>
       )}
+
+      {/* Routine popover — rendered outside overflow-hidden container */}
+      {routinePopover && (() => {
+        const routine = routines.find(r => r.id === routinePopover.id)
+        if (!routine?.memo) return null
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setRoutinePopover(null)}
+            />
+            <div
+              className="fixed z-50 w-56"
+              style={{ top: `${routinePopover.y}px`, left: `${routinePopover.x}px` }}
+            >
+              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm">
+                <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2 bg-teal-500/5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                  <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
+                  <span className="text-[9px] text-teal-400/40 font-mono ml-auto shrink-0">
+                    {routine.start_time}-{routine.end_time}
+                  </span>
+                </div>
+                <div className="px-3 py-2.5">
+                  <div className="text-[11px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
+                    {routine.memo}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
