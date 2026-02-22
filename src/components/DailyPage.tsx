@@ -136,6 +136,7 @@ interface RoutineItem {
   end_time: string
   day_of_week: string
   sort_order: number
+  memo: string | null
 }
 
 // Unified timeline item for rendering
@@ -174,6 +175,9 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 
   // Drop indicator for habit D&D
   const [dropIndicator, setDropIndicator] = useState<number | null>(null)
+
+  // Routine popover
+  const [routinePopover, setRoutinePopover] = useState<{ id: number; x: number; y: number } | null>(null)
 
   const fetchSchedules = useCallback(() => {
     setLoading(true)
@@ -417,14 +421,65 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
                   className="absolute left-11 right-0 z-[1] pointer-events-none"
                   style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                 >
-                  <div className="h-full mx-0.5 rounded-md border border-dashed border-teal-500/20 bg-teal-500/5">
+                  <div className="h-full mx-0.5 rounded-md border border-dashed border-teal-500/20 bg-teal-500/5 relative group/routine">
                     <span className="text-[9px] text-teal-400/30 font-medium px-2 pt-0.5 block truncate select-none">
                       {routine.name}
                     </span>
+                    {routine.memo && (
+                      <button
+                        className="absolute top-0.5 right-1 pointer-events-auto w-4 h-4 flex items-center justify-center rounded-full bg-teal-500/10 hover:bg-teal-500/30 text-teal-400/40 hover:text-teal-300 transition-all text-[8px]"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.right + 8, y: rect.top })
+                        }}
+                      >
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               )
             })}
+
+            {/* Routine popover */}
+            {routinePopover && (() => {
+              const routine = routines.find(r => r.id === routinePopover.id)
+              if (!routine?.memo) return null
+              const timelineRect = timelineRef.current?.getBoundingClientRect()
+              if (!timelineRect) return null
+              const popoverTop = routinePopover.y - timelineRect.top
+              const popoverLeft = routinePopover.x - timelineRect.left
+              return (
+                <>
+                  <div
+                    className="fixed inset-0 z-[29]"
+                    onClick={() => setRoutinePopover(null)}
+                  />
+                  <div
+                    className="absolute z-30 w-56 animate-in fade-in"
+                    style={{ top: `${popoverTop}px`, left: `${popoverLeft}px` }}
+                  >
+                    <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-xl shadow-teal-500/5 overflow-hidden">
+                      <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                        <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
+                        <span className="text-[9px] text-teal-400/40 font-mono ml-auto shrink-0">
+                          {routine.start_time}-{routine.end_time}
+                        </span>
+                      </div>
+                      <div className="px-3 py-2.5">
+                        <div className="text-[11px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
+                          {routine.memo}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
             {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes <= END_HOUR * 60 && (
               <div className="absolute left-11 right-0 z-20 flex items-center pointer-events-none"

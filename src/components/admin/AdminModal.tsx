@@ -19,6 +19,7 @@ interface Routine {
   end_time: string
   day_of_week: string
   sort_order: number
+  memo: string | null
   created_at: string
 }
 
@@ -531,6 +532,7 @@ function RoutinePanel() {
   const [formStartTime, setFormStartTime] = useState('09:00')
   const [formEndTime, setFormEndTime] = useState('10:00')
   const [formDays, setFormDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
+  const [formMemo, setFormMemo] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   // Drag state
@@ -554,6 +556,7 @@ function RoutinePanel() {
     setFormStartTime('09:00')
     setFormEndTime('10:00')
     setFormDays(new Set([1, 2, 3, 4, 5]))
+    setFormMemo('')
     setShowForm(false)
     setEditingId(null)
   }
@@ -567,6 +570,7 @@ function RoutinePanel() {
         start_time: formStartTime,
         end_time: formEndTime,
         day_of_week: daysToString(formDays),
+        memo: formMemo.trim() || null,
       })
       resetForm()
       refetch()
@@ -602,6 +606,7 @@ function RoutinePanel() {
     setFormStartTime(r.start_time)
     setFormEndTime(r.end_time)
     setFormDays(stringToDays(r.day_of_week))
+    setFormMemo(r.memo ?? '')
     setShowForm(false)
   }
 
@@ -664,7 +669,7 @@ function RoutinePanel() {
             onChange={e => setFormName(e.target.value)}
             placeholder="ルーティン名（例: 朝の準備）"
             className="w-full bg-[#16161e] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] focus:outline-none focus:ring-2 focus:ring-teal-500/50 placeholder:text-[#3a3a4e]"
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editingId ? handleUpdate(editingId, { name: formName.trim(), start_time: formStartTime, end_time: formEndTime, day_of_week: daysToString(formDays) }) : handleCreate() } }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editingId ? handleUpdate(editingId, { name: formName.trim(), start_time: formStartTime, end_time: formEndTime, day_of_week: daysToString(formDays), memo: formMemo.trim() || null }) : handleCreate() } }}
           />
           {/* Time range */}
           <div className="flex items-center gap-2">
@@ -720,6 +725,14 @@ function RoutinePanel() {
               ))}
             </div>
           </div>
+          {/* Memo */}
+          <textarea
+            value={formMemo}
+            onChange={e => setFormMemo(e.target.value)}
+            placeholder={'実施内容・気をつけること（任意）\n例:\n- ストレッチから始める\n- 水を飲んでから'}
+            rows={3}
+            className="w-full bg-[#16161e] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] focus:outline-none focus:ring-2 focus:ring-teal-500/50 placeholder:text-[#3a3a4e] resize-none"
+          />
           <div className="flex gap-2 justify-end">
             <button
               onClick={resetForm}
@@ -728,7 +741,7 @@ function RoutinePanel() {
               キャンセル
             </button>
             <button
-              onClick={() => editingId ? handleUpdate(editingId, { name: formName.trim(), start_time: formStartTime, end_time: formEndTime, day_of_week: daysToString(formDays) }) : handleCreate()}
+              onClick={() => editingId ? handleUpdate(editingId, { name: formName.trim(), start_time: formStartTime, end_time: formEndTime, day_of_week: daysToString(formDays), memo: formMemo.trim() || null }) : handleCreate()}
               disabled={!formName.trim() || submitting}
               className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-black hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
@@ -770,6 +783,9 @@ function RoutinePanel() {
                 &#x2807;
               </span>
               <span className="flex-1 text-sm text-[#e4e4ec] truncate">{routine.name}</span>
+              {routine.memo && (
+                <span className="text-[9px] text-teal-400/40 shrink-0" title={routine.memo}>&#x1F4DD;</span>
+              )}
               <span className="text-[10px] text-teal-400/60 font-mono shrink-0">
                 {routine.start_time} - {routine.end_time}
               </span>

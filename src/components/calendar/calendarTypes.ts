@@ -39,6 +39,7 @@ export interface RoutineItem {
   end_time: string
   day_of_week: string
   sort_order: number
+  memo: string | null
 }
 
 export type CalendarView = 'month' | 'week' | 'day'

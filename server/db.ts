@@ -122,5 +122,6 @@ try { db.exec(`ALTER TABLE schedules ADD COLUMN source TEXT`) } catch { /* alrea
 try { db.exec(`ALTER TABLE goals ADD COLUMN note TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_time TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_duration INTEGER`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE routines ADD COLUMN memo TEXT`) } catch { /* already exists */ }
 
 export default db;

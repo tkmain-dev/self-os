@@ -17,14 +17,14 @@ router.get('/', (req, res) => {
 
 // Create routine
 router.post('/', (req, res) => {
-  const { name, start_time, end_time, day_of_week } = req.body;
+  const { name, start_time, end_time, day_of_week, memo } = req.body;
   const maxOrder = db.prepare(
     'SELECT COALESCE(MAX(sort_order), 0) as m FROM routines'
   ).get() as { m: number };
 
   const result = db.prepare(
-    'INSERT INTO routines (name, start_time, end_time, day_of_week, sort_order) VALUES (?, ?, ?, ?, ?)'
-  ).run(name, start_time, end_time, day_of_week || '', maxOrder.m + 1);
+    'INSERT INTO routines (name, start_time, end_time, day_of_week, sort_order, memo) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(name, start_time, end_time, day_of_week || '', maxOrder.m + 1, memo || null);
 
   const item = db.prepare('SELECT * FROM routines WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(item);
@@ -35,14 +35,15 @@ router.patch('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM routines WHERE id = ?').get(req.params.id) as Record<string, unknown>;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
-  const { name, start_time, end_time, day_of_week } = req.body;
+  const { name, start_time, end_time, day_of_week, memo } = req.body;
   db.prepare(
-    'UPDATE routines SET name = ?, start_time = ?, end_time = ?, day_of_week = ? WHERE id = ?'
+    'UPDATE routines SET name = ?, start_time = ?, end_time = ?, day_of_week = ?, memo = ? WHERE id = ?'
   ).run(
     name ?? existing.name,
     start_time ?? existing.start_time,
     end_time ?? existing.end_time,
     day_of_week !== undefined ? day_of_week : existing.day_of_week,
+    memo !== undefined ? (memo || null) : existing.memo,
     req.params.id
   );
 

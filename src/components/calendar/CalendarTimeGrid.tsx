@@ -60,6 +60,9 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
     }
   }, [])
 
+  // Routine popover
+  const [routinePopover, setRoutinePopover] = useState<{ id: number; x: number; y: number } | null>(null)
+
   // Group events by column date
   const eventsByDate = new Map<string, CalendarEvent[]>()
   for (const ev of events) {
@@ -184,10 +187,24 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
                       className="absolute left-0 right-0 z-[1] pointer-events-none mx-0.5"
                       style={{ top: `${top}px`, height: `${height}px` }}
                     >
-                      <div className="h-full rounded-sm border border-dashed border-teal-500/20 bg-teal-500/5">
+                      <div className="h-full rounded-sm border border-dashed border-teal-500/20 bg-teal-500/5 relative">
                         <span className="text-[8px] text-teal-400/25 font-medium px-1 pt-px block truncate select-none">
                           {routine.name}
                         </span>
+                        {routine.memo && (
+                          <button
+                            className="absolute top-px right-0.5 pointer-events-auto w-3.5 h-3.5 flex items-center justify-center rounded-full bg-teal-500/10 hover:bg-teal-500/30 text-teal-400/40 hover:text-teal-300 transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                              setRoutinePopover(routinePopover?.id === routine.id ? null : { id: routine.id, x: rect.right + 6, y: rect.top })
+                            }}
+                          >
+                            <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -227,6 +244,39 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
           )
         })}
       </div>
+
+      {/* Routine popover */}
+      {routinePopover && (() => {
+        const routine = (routines ?? []).find(r => r.id === routinePopover.id)
+        if (!routine?.memo) return null
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-[39]"
+              onClick={() => setRoutinePopover(null)}
+            />
+            <div
+              className="fixed z-40 w-52"
+              style={{ top: `${routinePopover.y}px`, left: `${routinePopover.x}px` }}
+            >
+              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-xl shadow-teal-500/5 overflow-hidden">
+                <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                  <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
+                  <span className="text-[8px] text-teal-400/40 font-mono ml-auto shrink-0">
+                    {routine.start_time}-{routine.end_time}
+                  </span>
+                </div>
+                <div className="px-3 py-2.5">
+                  <div className="text-[10px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
+                    {routine.memo}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
