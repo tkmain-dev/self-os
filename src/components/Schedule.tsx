@@ -13,19 +13,21 @@ interface ScheduleItem {
 const formatDate = (d: Date) => d.toISOString().split('T')[0]
 
 const HOUR_HEIGHT = 60 // px per hour
-const START_HOUR = 6
-const END_HOUR = 24
+const START_HOUR = 7
+const END_HOUR = 27 // 翌3:00
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
 
-function timeToMinutes(time: string): number {
+function timeToGridMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
+  const minutes = h * 60 + m
+  if (h < START_HOUR) return minutes + 24 * 60
+  return minutes
 }
 
 function getEventStyle(item: ScheduleItem): React.CSSProperties | null {
   if (!item.start_time) return null
-  const startMin = timeToMinutes(item.start_time)
-  const endMin = item.end_time ? timeToMinutes(item.end_time) : startMin + 60
+  const startMin = timeToGridMinutes(item.start_time)
+  const endMin = item.end_time ? timeToGridMinutes(item.end_time) : startMin + 60
   const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
   const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 24)
   return { top: `${top}px`, height: `${height}px` }
@@ -94,7 +96,8 @@ export default function Schedule() {
 
   const isToday = date === formatDate(new Date())
   const now = new Date()
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const rawMinutes = now.getHours() * 60 + now.getMinutes()
+  const currentMinutes = rawMinutes < START_HOUR * 60 ? rawMinutes + 24 * 60 : rawMinutes
   const nowLineTop = ((currentMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT
 
   const timedEvents = schedules.filter(s => s.start_time)
@@ -184,18 +187,22 @@ export default function Schedule() {
           <div className="bg-white/80 rounded shadow-sm border border-stone-200 overflow-hidden">
             <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}>
               {/* Hour grid lines */}
-              {HOURS.map(h => (
+              {HOURS.map(h => {
+                const displayH = h >= 24 ? h - 24 : h
+                return (
                 <div
                   key={h}
                   className="absolute w-full border-t border-stone-100 flex"
                   style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
                 >
-                  <div className="w-14 pr-2 pt-1 text-right text-xs text-stone-400 shrink-0 select-none">
-                    {String(h).padStart(2, '0')}:00
+                  <div className={`w-14 pr-2 pt-1 text-right text-xs shrink-0 select-none ${h >= 24 ? 'text-stone-300' : 'text-stone-400'}`}>
+                    {h >= 24 && <span className="text-[10px] text-stone-300">翌</span>}
+                    {String(displayH).padStart(2, '0')}:00
                   </div>
                   <div className="flex-1 border-l border-stone-200" />
                 </div>
-              ))}
+              )})}
+
 
               {/* Now indicator */}
               {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes <= END_HOUR * 60 && (

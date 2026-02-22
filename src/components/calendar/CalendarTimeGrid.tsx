@@ -12,20 +12,24 @@ interface CalendarTimeGridProps {
 
 // Timeline constants (same as DailyPage)
 const HOUR_HEIGHT = 48
-const START_HOUR = 6
-const END_HOUR = 24
+const START_HOUR = 7
+const END_HOUR = 27 // 翌3:00 (7:00〜翌3:00 = 20時間)
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
 const TIME_LABEL_WIDTH = 48
 
-function timeToMinutes(time: string): number {
+// Convert HH:MM to grid minutes (early morning hours map to extended range)
+function timeToGridMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
+  const minutes = h * 60 + m
+  if (h < START_HOUR) return minutes + 24 * 60
+  return minutes
 }
 
 function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
+  const wrapped = minutes >= 24 * 60 ? minutes - 24 * 60 : minutes
+  const h = Math.floor(wrapped / 60)
+  const m = wrapped % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
@@ -33,23 +37,25 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
   const containerRef = useRef<HTMLDivElement>(null)
   const [nowMinutes, setNowMinutes] = useState(() => {
     const n = new Date()
-    return n.getHours() * 60 + n.getMinutes()
+    const raw = n.getHours() * 60 + n.getMinutes()
+    return raw < START_HOUR * 60 ? raw + 24 * 60 : raw
   })
 
   // Update current time every minute
   useEffect(() => {
     const tick = () => {
       const n = new Date()
-      setNowMinutes(n.getHours() * 60 + n.getMinutes())
+      const raw = n.getHours() * 60 + n.getMinutes()
+      setNowMinutes(raw < START_HOUR * 60 ? raw + 24 * 60 : raw)
     }
     const timer = setInterval(tick, 60000)
     return () => clearInterval(timer)
   }, [])
 
-  // Scroll to 8am on mount
+  // Scroll to 9am on mount
   useEffect(() => {
     if (containerRef.current) {
-      const scrollTo = (8 - START_HOUR) * HOUR_HEIGHT
+      const scrollTo = (9 - START_HOUR) * HOUR_HEIGHT
       containerRef.current.scrollTop = scrollTo
     }
   }, [])
@@ -112,15 +118,19 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
       <div className="relative flex" style={{ height: `${TOTAL_HEIGHT}px` }}>
         {/* Time labels */}
         <div className="shrink-0 relative" style={{ width: `${TIME_LABEL_WIDTH}px` }}>
-          {HOURS.map(h => (
-            <div
-              key={h}
-              className="absolute w-full pr-1 pt-0.5 text-right text-[10px] text-[#5a5a6e] select-none"
-              style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
-            >
-              {String(h).padStart(2, '0')}:00
-            </div>
-          ))}
+          {HOURS.map(h => {
+            const displayH = h >= 24 ? h - 24 : h
+            return (
+              <div
+                key={h}
+                className={`absolute w-full pr-1 pt-0.5 text-right text-[10px] select-none ${h >= 24 ? 'text-[#4a4a5e]' : 'text-[#5a5a6e]'}`}
+                style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
+              >
+                {h >= 24 && <span className="text-[8px] text-[#3a3a4e]">翌</span>}
+                {String(displayH).padStart(2, '0')}:00
+              </div>
+            )
+          })}
         </div>
 
         {/* Columns */}
@@ -138,11 +148,18 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
             >
               {/* Hour grid lines */}
               {HOURS.map(h => (
-                <div
-                  key={h}
-                  className="absolute w-full border-t border-[#1f1f2e]"
-                  style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
-                />
+                <div key={h}>
+                  <div
+                    className="absolute w-full border-t border-[#1f1f2e]"
+                    style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
+                  />
+                  {h === 24 && (
+                    <div
+                      className="absolute w-full border-t border-dashed border-[#3a3a4e]"
+                      style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px` }}
+                    />
+                  )}
+                </div>
               ))}
 
               {/* Today column highlight */}
@@ -157,8 +174,8 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
                   return r.day_of_week.split(',').filter(Boolean).includes(String(dow))
                 })
                 .map(routine => {
-                  const startMin = timeToMinutes(routine.start_time)
-                  const endMin = timeToMinutes(routine.end_time)
+                  const startMin = timeToGridMinutes(routine.start_time)
+                  const endMin = timeToGridMinutes(routine.end_time)
                   const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
                   const height = ((endMin - startMin) / 60) * HOUR_HEIGHT
                   return (
@@ -192,8 +209,8 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
               {/* Events */}
               {colEvents.map((ev, evIdx) => {
                 if (!ev.startTime) return null
-                const startMin = timeToMinutes(ev.startTime)
-                const endMin = ev.endTime ? timeToMinutes(ev.endTime) : startMin + 60
+                const startMin = timeToGridMinutes(ev.startTime)
+                const endMin = ev.endTime ? timeToGridMinutes(ev.endTime) : startMin + 60
                 const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
                 const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 22)
                 return (

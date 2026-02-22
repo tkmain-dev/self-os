@@ -40,16 +40,25 @@ function formatDateLabel(dateStr: string): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${dayNames[d.getDay()]}）`
 }
 
-function timeToMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
 // ── Timeline constants ──
 const HOUR_HEIGHT = 48
-const START_HOUR = 6
-const END_HOUR = 24
+const START_HOUR = 7
+const END_HOUR = 27 // 翌3:00 (7:00〜翌3:00 = 20時間)
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
+
+// Convert HH:MM to grid minutes (early morning hours map to extended range)
+function timeToGridMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  const minutes = h * 60 + m
+  if (h < START_HOUR) return minutes + 24 * 60
+  return minutes
+}
+
+// Convert grid minutes back to HH:MM (wraps around 24h for storage)
+function gridMinutesToTime(m: number): string {
+  const wrapped = m >= 24 * 60 ? m - 24 * 60 : m
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`
+}
 
 const COLORS = [
   'bg-amber-500/10 border-amber-500 text-amber-300',
@@ -224,6 +233,7 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
     const snapped = Math.round(minutes / 15) * 15
     const clampedMin = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - 30, snapped))
     setDropIndicator(((clampedMin - START_HOUR * 60) / 60) * HOUR_HEIGHT)
+    // Note: snapped/clampedMin are in grid-space (e.g. 25*60 for 1AM)
   }
 
   const handleHabitDrop = async (e: React.DragEvent) => {
@@ -240,12 +250,11 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
     const snapped = Math.round(minutes / 15) * 15
     const startMin = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - duration, snapped))
     const endMin = startMin + duration
-    const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
     await apiPost('/api/schedules', {
       title: habitName,
       date,
-      start_time: fmt(startMin),
-      end_time: fmt(endMin),
+      start_time: gridMinutesToTime(startMin),
+      end_time: gridMinutesToTime(endMin),
       source: 'habit',
     })
     fetchSchedules()
@@ -294,8 +303,7 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
         if (item) {
           const startMin = START_HOUR * 60 + (ghostStyle.top / HOUR_HEIGHT) * 60
           const endMin = startMin + (ghostStyle.height / HOUR_HEIGHT) * 60
-          const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-          await apiPatch(`/api/schedules/${dragging.id}`, { start_time: fmt(startMin), end_time: fmt(endMin) })
+          await apiPatch(`/api/schedules/${dragging.id}`, { start_time: gridMinutesToTime(startMin), end_time: gridMinutesToTime(endMin) })
           fetchSchedules()
         }
       }
@@ -311,7 +319,8 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   }, [dragging, ghostStyle, schedules])
 
   const now = new Date()
-  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const rawMinutes = now.getHours() * 60 + now.getMinutes()
+  const currentMinutes = rawMinutes < START_HOUR * 60 ? rawMinutes + 24 * 60 : rawMinutes
   const nowLineTop = ((currentMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT
 
   const timedSchedules = schedules.filter(s => s.start_time)
@@ -381,20 +390,25 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
             onDragOver={handleHabitDragOver}
             onDragLeave={() => setDropIndicator(null)}
             onDrop={handleHabitDrop}>
-            {HOURS.map(h => (
+            {HOURS.map(h => {
+              const displayH = h >= 24 ? h - 24 : h
+              const isMidnight = h === 24
+              return (
               <div key={h} className="absolute w-full border-t border-[#1f1f2e] flex"
                 style={{ top: `${(h - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}>
-                <div className="w-11 pr-1 pt-0.5 text-right text-[10px] text-[#5a5a6e] shrink-0 select-none">
-                  {String(h).padStart(2, '0')}:00
+                {isMidnight && <div className="absolute left-0 right-0 top-0 border-t border-dashed border-[#3a3a4e]" />}
+                <div className={`w-11 pr-1 pt-0.5 text-right text-[10px] shrink-0 select-none ${h >= 24 ? 'text-[#4a4a5e]' : 'text-[#5a5a6e]'}`}>
+                  {h >= 24 && <span className="text-[8px] text-[#3a3a4e]">翌</span>}
+                  {String(displayH).padStart(2, '0')}:00
                 </div>
                 <div className="flex-1 border-l border-[#2a2a3a]" />
               </div>
-            ))}
+            )})}
 
             {/* Routine background blocks */}
             {routines.map(routine => {
-              const startMin = timeToMinutes(routine.start_time)
-              const endMin = timeToMinutes(routine.end_time)
+              const startMin = timeToGridMinutes(routine.start_time)
+              const endMin = timeToGridMinutes(routine.end_time)
               const topPx = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
               const heightPx = ((endMin - startMin) / 60) * HOUR_HEIGHT
               return (
@@ -422,8 +436,8 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 
             {allTimedItems.map((item, i) => {
               if (!item.start_time) return null
-              const startMin = timeToMinutes(item.start_time)
-              const endMin = item.end_time ? timeToMinutes(item.end_time) : startMin + 60
+              const startMin = timeToGridMinutes(item.start_time)
+              const endMin = item.end_time ? timeToGridMinutes(item.end_time) : startMin + 60
               const topPx = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
               const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 22)
               const isGoal = item.source === 'goal'
