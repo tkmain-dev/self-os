@@ -60,14 +60,6 @@ const COLORS = [
   'bg-emerald-500/10 border-emerald-500 text-emerald-300',
 ]
 
-function getEventStyle(item: ScheduleItem): React.CSSProperties | null {
-  if (!item.start_time) return null
-  const startMin = timeToMinutes(item.start_time)
-  const endMin = item.end_time ? timeToMinutes(item.end_time) : startMin + 60
-  const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
-  const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 22)
-  return { top: `${top}px`, height: `${height}px` }
-}
 
 // ══════════════════════════════════════
 // DailyPage
@@ -118,8 +110,37 @@ export default function DailyPage() {
 // ══════════════════════════════════════
 // Schedule Timeline
 // ══════════════════════════════════════
+interface GoalItem {
+  id: number
+  title: string
+  issue_type: string
+  start_date: string
+  end_date: string
+  scheduled_time: string | null
+  scheduled_duration: number | null
+}
+
+// Unified timeline item for rendering
+interface TimelineItem {
+  id: string        // prefixed to avoid collision: 's-1' or 'g-1'
+  title: string
+  start_time: string | null
+  end_time: string | null
+  source: 'schedule' | 'goal'
+  scheduleId?: number  // for delete
+}
+
+function addMinutesToTime(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  const hh = Math.floor(total / 60) % 24
+  const mm = total % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
 function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean }) {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([])
+  const [goals, setGoals] = useState<GoalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -137,12 +158,28 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 
   const fetchSchedules = useCallback(() => {
     setLoading(true)
-    fetch(`/api/schedules?date=${date}`)
-      .then(r => r.json())
-      .then(d => { setSchedules(d); setLoading(false); })
+    Promise.all([
+      fetch(`/api/schedules?date=${date}`).then(r => r.json()),
+      fetch(`/api/goals?from=${date}&to=${date}`).then(r => r.json()),
+    ]).then(([s, g]) => {
+      setSchedules(s)
+      setGoals(g)
+      setLoading(false)
+    })
   }, [date])
 
   useEffect(() => { fetchSchedules() }, [fetchSchedules])
+
+  // Timed goals (task/subtask with scheduled_time on this date)
+  const timedGoals: TimelineItem[] = goals
+    .filter(g => g.scheduled_time && (g.issue_type === 'task' || g.issue_type === 'subtask'))
+    .map(g => ({
+      id: `g-${g.id}`,
+      title: g.title,
+      start_time: g.scheduled_time,
+      end_time: addMinutesToTime(g.scheduled_time!, g.scheduled_duration ?? 60),
+      source: 'goal' as const,
+    }))
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -264,8 +301,21 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const nowLineTop = ((currentMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT
 
-  const timedEvents = schedules.filter(s => s.start_time)
+  const timedSchedules = schedules.filter(s => s.start_time)
   const untimedEvents = schedules.filter(s => !s.start_time)
+
+  // Merge timed schedules + timed goals for timeline display
+  const allTimedItems: TimelineItem[] = [
+    ...timedSchedules.map(s => ({
+      id: `s-${s.id}`,
+      title: s.title,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      source: 'schedule' as const,
+      scheduleId: s.id,
+    })),
+    ...timedGoals,
+  ]
 
   return (
     <div>
@@ -336,31 +386,45 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
               </div>
             )}
 
-            {timedEvents.map((item, i) => {
-              const style = getEventStyle(item)
-              if (!style) return null
-              const topPx = parseFloat(style.top as string)
-              const heightPx = parseFloat(style.height as string)
-              const isDraggingThis = dragging?.id === item.id
+            {allTimedItems.map((item, i) => {
+              if (!item.start_time) return null
+              const startMin = timeToMinutes(item.start_time)
+              const endMin = item.end_time ? timeToMinutes(item.end_time) : startMin + 60
+              const topPx = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
+              const heightPx = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 22)
+              const isGoal = item.source === 'goal'
+              const colorClass = isGoal
+                ? 'bg-sky-500/10 border-sky-500 text-sky-300'
+                : COLORS[i % COLORS.length]
+              const isDraggingThis = dragging?.id === item.scheduleId
               return (
                 <div key={item.id}
-                  className={`absolute left-12 right-1 z-10 ${COLORS[i % COLORS.length]} border-l-4 rounded px-2 py-0.5 overflow-hidden ${dragging ? (isDraggingThis ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-grab'} group`}
-                  style={{ ...style, opacity: isDraggingThis ? 0.4 : 1 }}
-                  onMouseDown={e => handleMouseDownMove(e, item, topPx, heightPx)}>
+                  className={`absolute left-12 right-1 z-10 ${colorClass} border-l-4 rounded px-2 py-0.5 overflow-hidden ${
+                    isGoal ? '' : (dragging ? (isDraggingThis ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-grab')
+                  } group`}
+                  style={{ top: `${topPx}px`, height: `${heightPx}px`, opacity: isDraggingThis ? 0.4 : 1 }}
+                  onMouseDown={isGoal ? undefined : e => handleMouseDownMove(e, schedules.find(s => s.id === item.scheduleId)!, topPx, heightPx)}>
                   <div className="flex items-start justify-between gap-1">
                     <div className="min-w-0">
-                      <div className="font-medium text-xs truncate">{item.title}</div>
+                      <div className="font-medium text-xs truncate flex items-center gap-1">
+                        {isGoal && <span className="text-[8px] px-1 py-px rounded bg-sky-500/20 text-sky-400/70 shrink-0">WBS</span>}
+                        {item.title}
+                      </div>
                       <div className="text-[10px] opacity-70">
                         {item.start_time}{item.end_time ? ` - ${item.end_time}` : ''}
                       </div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
-                      className="opacity-0 group-hover:opacity-70 hover:!opacity-100 text-xs shrink-0">&times;</button>
+                    {!isGoal && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(item.scheduleId!) }}
+                        className="opacity-0 group-hover:opacity-70 hover:!opacity-100 text-xs shrink-0">&times;</button>
+                    )}
                   </div>
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-amber-400/30"
-                    onMouseDown={e => handleMouseDownResize(e, item, topPx, heightPx)}
-                  />
+                  {!isGoal && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-amber-400/30"
+                      onMouseDown={e => handleMouseDownResize(e, schedules.find(s => s.id === item.scheduleId)!, topPx, heightPx)}
+                    />
+                  )}
                 </div>
               )
             })}

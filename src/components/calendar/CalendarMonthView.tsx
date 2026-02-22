@@ -61,17 +61,29 @@ export default function CalendarMonthView({
   const grid = useMemo(() => getMonthGrid(year, month), [year, month])
   const today = useMemo(() => formatDate(new Date()), [])
 
-  // Build goal tree for nested band rendering
-  const goalTree = useMemo(() => buildGoalTree(goals), [goals])
+  // Build goal tree for nested band rendering (exclude timed goals — they go to day cells)
+  const bandGoals = useMemo(() => goals.filter(g => !g.scheduled_time), [goals])
+  const goalTree = useMemo(() => buildGoalTree(bandGoals), [bandGoals])
 
-  // Build schedule map by date
-  const schedulesByDate = useMemo(() => {
+  // Build event map by date: schedules + timed goals
+  const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
+    const add = (dateKey: string, ev: CalendarEvent) => {
+      const existing = map.get(dateKey) ?? []
+      existing.push(ev)
+      map.set(dateKey, existing)
+    }
     for (const e of events) {
       if (e.type === 'schedule') {
-        const existing = map.get(e.date) ?? []
-        existing.push(e)
-        map.set(e.date, existing)
+        add(e.date, e)
+      } else if (e.type === 'goal' && e.startTime) {
+        // Timed goal: show on each day in its date range
+        const start = new Date(e.date + 'T00:00:00')
+        const end = new Date((e.endDate ?? e.date) + 'T00:00:00')
+        const fmt = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          add(fmt(d), e)
+        }
       }
     }
     return map
@@ -141,7 +153,7 @@ export default function CalendarMonthView({
                 const isToday = dateStr === today
                 const isWeekend = dayIdx === 5 || dayIdx === 6
 
-                const daySchedules = schedulesByDate.get(dateStr) ?? []
+                const daySchedules = eventsByDate.get(dateStr) ?? []
 
                 return (
                   <CalendarDayCell

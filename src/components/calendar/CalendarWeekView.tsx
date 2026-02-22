@@ -58,8 +58,9 @@ export default function CalendarWeekView({
   const weekStart = weekDays[0]
   const weekEnd = weekDays[6]
 
-  // Build goal tree and layout bands
-  const goalTree = useMemo(() => buildGoalTree(goals), [goals])
+  // Build goal tree and layout bands (exclude timed goals — they go to time grid)
+  const bandGoals = useMemo(() => goals.filter(g => !g.scheduled_time), [goals])
+  const goalTree = useMemo(() => buildGoalTree(bandGoals), [bandGoals])
   const bands = useMemo(() => layoutWeekBands(goalTree, weekStart, weekEnd), [goalTree, weekStart, weekEnd])
   const bandsHeight = useMemo(() => calcWeekBandsHeight(goalTree, weekStart, weekEnd), [goalTree, weekStart, weekEnd])
 
@@ -69,9 +70,9 @@ export default function CalendarWeekView({
     [events],
   )
 
-  // Timed events for the time grid
+  // Timed events for the time grid (schedules + timed goals)
   const timedEvents = useMemo(
-    () => events.filter((e) => e.type === 'schedule' && e.startTime),
+    () => events.filter((e) => e.startTime),
     [events],
   )
 

@@ -22,6 +22,8 @@ interface Goal {
   memo: string | null
   note: string | null
   sort_order: number
+  scheduled_time: string | null
+  scheduled_duration: number | null
 }
 
 interface TicketDetailModalProps {
@@ -70,6 +72,8 @@ export default function TicketDetailModal({ goal, onClose, onUpdate }: TicketDet
   const [startDate, setStartDate] = useState(goal.start_date)
   const [endDate, setEndDate] = useState(goal.end_date)
   const [color, setColor] = useState(goal.color)
+  const [scheduledTime, setScheduledTime] = useState(goal.scheduled_time ?? '')
+  const [scheduledDuration, setScheduledDuration] = useState(goal.scheduled_duration ?? 60)
 
   // ── Note editor state ──
   const [saved, setSaved] = useState(false)
@@ -252,6 +256,64 @@ export default function TicketDetailModal({ goal, onClose, onUpdate }: TicketDet
             </div>
           </div>
         </div>
+
+        {/* ── Schedule section (task / subtask only) ── */}
+        {(issueType === 'task' || issueType === 'subtask') && (
+          <div className="px-6 py-4 border-b border-[#2a2a3a]">
+            <label className="block text-[10px] font-medium text-[#5a5a6e] mb-2 uppercase tracking-wider">Schedule</label>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Time picker */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#5a5a6e]">開始</span>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={e => {
+                    setScheduledTime(e.target.value)
+                    patchField({ scheduled_time: e.target.value || null })
+                  }}
+                  className="bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-2 py-1.5 text-[#e4e4ec] focus:outline-none focus:border-amber-500/40 text-xs"
+                />
+              </div>
+              {/* Duration presets */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-[#5a5a6e]">所要</span>
+                {[30, 60, 90, 120].map(d => (
+                  <button key={d} type="button"
+                    onClick={() => { setScheduledDuration(d); patchField({ scheduled_duration: d }) }}
+                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                      scheduledDuration === d
+                        ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20'
+                        : 'bg-[#1e1e2a] text-[#5a5a6e] hover:bg-[#252535] hover:text-[#8b8b9e]'
+                    }`}>
+                    {d < 60 ? `${d}分` : `${d / 60}h`}
+                  </button>
+                ))}
+                {/* Custom duration */}
+                <div className={`flex items-center rounded-md border overflow-hidden transition-colors ${
+                  ![30, 60, 90, 120].includes(scheduledDuration)
+                    ? 'border-amber-500/40 bg-amber-500/5'
+                    : 'border-[#2a2a3a] bg-[#1e1e2a]'
+                }`}>
+                  <button type="button" onClick={() => { const v = Math.max(15, scheduledDuration - 15); setScheduledDuration(v); patchField({ scheduled_duration: v }) }}
+                    className="px-1.5 py-1 text-[#5a5a6e] hover:text-amber-400 text-xs font-semibold">−</button>
+                  <span className="w-6 text-center text-[10px] text-[#e4e4ec] font-mono">{scheduledDuration}</span>
+                  <span className="text-[8px] text-[#5a5a6e] pr-1">分</span>
+                  <button type="button" onClick={() => { const v = Math.min(480, scheduledDuration + 15); setScheduledDuration(v); patchField({ scheduled_duration: v }) }}
+                    className="px-1.5 py-1 text-[#5a5a6e] hover:text-amber-400 text-xs font-semibold border-l border-[#2a2a3a]">+</button>
+                </div>
+              </div>
+              {/* Clear button */}
+              {scheduledTime && (
+                <button type="button"
+                  onClick={() => { setScheduledTime(''); patchField({ scheduled_time: null }) }}
+                  className="text-[10px] text-[#5a5a6e] hover:text-red-400 transition-colors px-2 py-1 rounded-md border border-[#2a2a3a] hover:border-red-500/30">
+                  クリア
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Note editor section ── */}
         <div className="px-6 py-5">

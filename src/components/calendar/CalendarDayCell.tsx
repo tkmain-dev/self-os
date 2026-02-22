@@ -75,6 +75,15 @@ export default function CalendarDayCell({
                   {ev.title}
                 </span>
               </div>
+            ) : ev.startTime ? (
+              /* Timed goal: schedule-like display with WBS indicator */
+              <div className="flex items-center gap-1 group">
+                <span className="w-1.5 h-1.5 rounded-sm bg-sky-400 shrink-0" />
+                <span className="text-[10px] text-[#c0c0d0] truncate group-hover:text-[#e4e4ec] transition-colors">
+                  <span className="text-sky-500/60 mr-0.5">{ev.startTime}</span>
+                  {ev.title}
+                </span>
+              </div>
             ) : (
               <div className="group">
                 <div

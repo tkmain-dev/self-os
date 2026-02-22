@@ -22,6 +22,8 @@ export interface GoalItem {
   color: string
   memo: string | null
   sort_order: number
+  scheduled_time: string | null
+  scheduled_duration: number | null
 }
 
 export interface GoalTreeNode {

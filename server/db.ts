@@ -110,5 +110,7 @@ try { db.exec(`ALTER TABLE habits ADD COLUMN duration INTEGER NOT NULL DEFAULT 3
 try { db.exec(`ALTER TABLE habits ADD COLUMN day_of_week TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE schedules ADD COLUMN source TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE goals ADD COLUMN note TEXT`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_time TEXT`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_duration INTEGER`) } catch { /* already exists */ }
 
 export default db;

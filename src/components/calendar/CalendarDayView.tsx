@@ -20,10 +20,10 @@ const LEAF_STYLES: Record<string, { bg: string; border: string; text: string }> 
 
 export default function CalendarDayView({ date, events, goals, onSlotClick, onEventClick }: CalendarDayViewProps) {
   const allDaySchedules = events.filter(e => e.type === 'schedule' && !e.startTime)
-  const timedSchedules = events.filter(e => e.type === 'schedule' && e.startTime)
+  const timedEvents = events.filter(e => e.startTime)
 
-  // Build goal tree and extract leaves for this day
-  const dayGoals = useMemo(() => goals.filter(g => g.start_date <= date && g.end_date >= date), [goals, date])
+  // Build goal tree and extract leaves for this day (exclude timed goals — they go to time grid)
+  const dayGoals = useMemo(() => goals.filter(g => g.start_date <= date && g.end_date >= date && !g.scheduled_time), [goals, date])
   const goalTree = useMemo(() => buildGoalTree(dayGoals), [dayGoals])
   const leaves = useMemo(() => collectLeaves(goalTree), [goalTree])
 
@@ -84,7 +84,7 @@ export default function CalendarDayView({ date, events, goals, onSlotClick, onEv
       {/* Time grid */}
       <CalendarTimeGrid
         columns={columns}
-        events={timedSchedules}
+        events={timedEvents}
         onSlotClick={onSlotClick}
         onEventClick={onEventClick}
       />

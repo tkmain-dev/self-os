@@ -18,6 +18,8 @@ interface Goal {
   memo: string | null
   note: string | null
   sort_order: number
+  scheduled_time: string | null
+  scheduled_duration: number | null
 }
 
 interface TreeNode extends Goal {

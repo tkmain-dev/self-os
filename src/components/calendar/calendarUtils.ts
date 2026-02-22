@@ -76,6 +76,17 @@ export function addDays(dateStr: string, days: number): string {
 }
 
 /**
+ * Add minutes to a "HH:mm" time string, returning "HH:mm".
+ */
+function addMinutesToTime(time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  const hh = Math.floor(total / 60) % 24
+  const mm = total % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+/**
  * Merges schedules and goals into a unified CalendarEvent array.
  */
 export function mergeEvents(schedules: ScheduleItem[] | null, goals: GoalItem[] | null): CalendarEvent[] {
@@ -98,7 +109,7 @@ export function mergeEvents(schedules: ScheduleItem[] | null, goals: GoalItem[] 
 
   if (goals) {
     for (const g of goals) {
-      events.push({
+      const ev: CalendarEvent = {
         type: 'goal',
         id: g.id,
         title: g.title,
@@ -108,7 +119,12 @@ export function mergeEvents(schedules: ScheduleItem[] | null, goals: GoalItem[] 
         status: g.status,
         issueType: g.issue_type,
         original: g,
-      })
+      }
+      if (g.scheduled_time) {
+        ev.startTime = g.scheduled_time
+        ev.endTime = addMinutesToTime(g.scheduled_time, g.scheduled_duration ?? 60)
+      }
+      events.push(ev)
     }
   }
 
