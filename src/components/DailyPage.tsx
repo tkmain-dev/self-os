@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { apiPost, apiPut, apiPatch, apiDelete } from '../hooks/useApi'
 import Diary from './Diary'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // ── Types ──
 interface ScheduleItem {
@@ -1273,14 +1275,16 @@ function WeeklyGoalSection() {
         {/* Expandable detail panel */}
         <div
           className={`overflow-hidden transition-all duration-300 ease-out ${
-            expanded ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+            expanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
           <div className="px-4 pb-3">
             <div className="border-t border-amber-500/10 pt-3">
               <div className="flex items-start gap-2">
                 <div className="w-0.5 h-full min-h-[20px] bg-gradient-to-b from-amber-400/40 to-amber-400/0 rounded-full shrink-0 mt-0.5" />
-                <div className="text-xs text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">{memo}</div>
+                <div className="weekly-goal-markdown text-xs text-[#b0b0c0] leading-relaxed flex-1 min-w-0">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{memo ?? ''}</ReactMarkdown>
+                </div>
               </div>
             </div>
           </div>
