@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useApi } from '../../hooks/useApi'
-import type { ScheduleItem, GoalItem, CalendarView, CalendarEvent } from './calendarTypes'
+import type { ScheduleItem, GoalItem, CalendarView, CalendarEvent, RoutineItem } from './calendarTypes'
 import { formatDate, getMonthRange, getWeekRange, getDayRange, mergeEvents } from './calendarUtils'
 import CalendarHeader from './CalendarHeader'
 import CalendarMonthView from './CalendarMonthView'
@@ -31,6 +31,7 @@ export default function CalendarPage() {
   const { data: goals, refetch: refetchGoals } = useApi<GoalItem[]>(
     `/api/goals?from=${range.from}&to=${range.to}`
   )
+  const { data: routines } = useApi<RoutineItem[]>('/api/routines')
 
   // Merge into unified events — exclude habit-derived schedules
   const nonHabitSchedules = useMemo(
@@ -132,6 +133,7 @@ export default function CalendarPage() {
           anchorDate={anchorDate}
           events={events}
           goals={goalsArray}
+          routines={routines ?? []}
           onSlotClick={handleSlotClick}
           onEventClick={handleEventClick}
         />
@@ -142,6 +144,7 @@ export default function CalendarPage() {
           date={anchorDate}
           events={events}
           goals={goalsArray}
+          routines={routines ?? []}
           onSlotClick={handleSlotClick}
           onEventClick={handleEventClick}
         />

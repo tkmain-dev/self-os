@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
 import CalendarTimeGrid from './CalendarTimeGrid'
 import { formatDate, buildGoalTree, collectLeaves } from './calendarUtils'
-import type { GoalItem, CalendarEvent } from './calendarTypes'
+import type { GoalItem, CalendarEvent, RoutineItem } from './calendarTypes'
 
 interface CalendarDayViewProps {
   date: string
   events: CalendarEvent[]
   goals: GoalItem[]
+  routines: RoutineItem[]
   onSlotClick: (date: string, time: string) => void
   onEventClick: (event: CalendarEvent) => void
 }
@@ -18,7 +19,7 @@ const LEAF_STYLES: Record<string, { bg: string; border: string; text: string }> 
   epic:    { bg: 'bg-violet-500/12', border: 'border-l-[3px] border-violet-500', text: 'text-violet-300' },
 }
 
-export default function CalendarDayView({ date, events, goals, onSlotClick, onEventClick }: CalendarDayViewProps) {
+export default function CalendarDayView({ date, events, goals, routines, onSlotClick, onEventClick }: CalendarDayViewProps) {
   const allDaySchedules = events.filter(e => e.type === 'schedule' && !e.startTime)
   const timedEvents = events.filter(e => e.startTime)
 
@@ -85,6 +86,7 @@ export default function CalendarDayView({ date, events, goals, onSlotClick, onEv
       <CalendarTimeGrid
         columns={columns}
         events={timedEvents}
+        routines={routines}
         onSlotClick={onSlotClick}
         onEventClick={onEventClick}
       />

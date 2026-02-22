@@ -1,10 +1,11 @@
 import { useRef, useEffect, useState } from 'react'
-import type { CalendarEvent } from './calendarTypes'
+import type { CalendarEvent, RoutineItem } from './calendarTypes'
 import CalendarEventItem from './CalendarEventItem'
 
 interface CalendarTimeGridProps {
   columns: { date: string; isToday: boolean }[]
   events: CalendarEvent[]
+  routines?: RoutineItem[]
   onSlotClick: (date: string, time: string) => void
   onEventClick: (event: CalendarEvent) => void
 }
@@ -28,7 +29,7 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export default function CalendarTimeGrid({ columns, events, onSlotClick, onEventClick }: CalendarTimeGridProps) {
+export default function CalendarTimeGrid({ columns, events, routines, onSlotClick, onEventClick }: CalendarTimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [nowMinutes, setNowMinutes] = useState(() => {
     const n = new Date()
@@ -148,6 +149,32 @@ export default function CalendarTimeGrid({ columns, events, onSlotClick, onEvent
               {col.isToday && (
                 <div className="absolute inset-0 bg-amber-500/5 pointer-events-none" />
               )}
+
+              {/* Routine background blocks */}
+              {(routines ?? [])
+                .filter(r => {
+                  const dow = new Date(col.date + 'T00:00:00').getDay()
+                  return r.day_of_week.split(',').filter(Boolean).includes(String(dow))
+                })
+                .map(routine => {
+                  const startMin = timeToMinutes(routine.start_time)
+                  const endMin = timeToMinutes(routine.end_time)
+                  const top = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
+                  const height = ((endMin - startMin) / 60) * HOUR_HEIGHT
+                  return (
+                    <div
+                      key={`routine-${routine.id}`}
+                      className="absolute left-0 right-0 z-[1] pointer-events-none mx-0.5"
+                      style={{ top: `${top}px`, height: `${height}px` }}
+                    >
+                      <div className="h-full rounded-sm border border-dashed border-teal-500/20 bg-teal-500/5">
+                        <span className="text-[8px] text-teal-400/25 font-medium px-1 pt-px block truncate select-none">
+                          {routine.name}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
 
               {/* Current time line (red) */}
               {col.isToday && showNowLine && (

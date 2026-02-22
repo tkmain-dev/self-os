@@ -4,12 +4,13 @@ import {
   getWeekDays, formatDate,
   buildGoalTree, layoutWeekBands, calcWeekBandsHeight,
 } from './calendarUtils'
-import type { GoalItem, CalendarEvent, BandSegment } from './calendarTypes'
+import type { GoalItem, CalendarEvent, BandSegment, RoutineItem } from './calendarTypes'
 
 interface CalendarWeekViewProps {
   anchorDate: string
   events: CalendarEvent[]
   goals: GoalItem[]
+  routines: RoutineItem[]
   onSlotClick: (date: string, time: string) => void
   onEventClick: (event: CalendarEvent) => void
 }
@@ -49,6 +50,7 @@ export default function CalendarWeekView({
   anchorDate,
   events,
   goals,
+  routines,
   onSlotClick,
   onEventClick,
 }: CalendarWeekViewProps) {
@@ -143,6 +145,7 @@ export default function CalendarWeekView({
       <CalendarTimeGrid
         columns={columns}
         events={timedEvents}
+        routines={routines}
         onSlotClick={onSlotClick}
         onEventClick={onEventClick}
       />

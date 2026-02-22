@@ -120,6 +120,15 @@ interface GoalItem {
   scheduled_duration: number | null
 }
 
+interface RoutineItem {
+  id: number
+  name: string
+  start_time: string
+  end_time: string
+  day_of_week: string
+  sort_order: number
+}
+
 // Unified timeline item for rendering
 interface TimelineItem {
   id: string        // prefixed to avoid collision: 's-1' or 'g-1'
@@ -141,6 +150,7 @@ function addMinutesToTime(time: string, minutes: number): string {
 function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean }) {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([])
   const [goals, setGoals] = useState<GoalItem[]>([])
+  const [routines, setRoutines] = useState<RoutineItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -158,12 +168,15 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
 
   const fetchSchedules = useCallback(() => {
     setLoading(true)
+    const dateDay = new Date(date + 'T00:00:00').getDay()
     Promise.all([
       fetch(`/api/schedules?date=${date}`).then(r => r.json()),
       fetch(`/api/goals?from=${date}&to=${date}`).then(r => r.json()),
-    ]).then(([s, g]) => {
+      fetch(`/api/routines?day=${dateDay}`).then(r => r.json()),
+    ]).then(([s, g, r]) => {
       setSchedules(s)
       setGoals(g)
+      setRoutines(r)
       setLoading(false)
     })
   }, [date])
@@ -377,6 +390,27 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
                 <div className="flex-1 border-l border-[#2a2a3a]" />
               </div>
             ))}
+
+            {/* Routine background blocks */}
+            {routines.map(routine => {
+              const startMin = timeToMinutes(routine.start_time)
+              const endMin = timeToMinutes(routine.end_time)
+              const topPx = ((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
+              const heightPx = ((endMin - startMin) / 60) * HOUR_HEIGHT
+              return (
+                <div
+                  key={`routine-${routine.id}`}
+                  className="absolute left-11 right-0 z-[1] pointer-events-none"
+                  style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                >
+                  <div className="h-full mx-0.5 rounded-md border border-dashed border-teal-500/20 bg-teal-500/5">
+                    <span className="text-[9px] text-teal-400/30 font-medium px-2 pt-0.5 block truncate select-none">
+                      {routine.name}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
 
             {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes <= END_HOUR * 60 && (
               <div className="absolute left-11 right-0 z-20 flex items-center pointer-events-none"

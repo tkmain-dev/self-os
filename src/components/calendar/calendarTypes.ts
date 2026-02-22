@@ -32,6 +32,15 @@ export interface GoalTreeNode {
   depth: number
 }
 
+export interface RoutineItem {
+  id: number
+  name: string
+  start_time: string
+  end_time: string
+  day_of_week: string
+  sort_order: number
+}
+
 export type CalendarView = 'month' | 'week' | 'day'
 
 export interface CalendarEvent {
