@@ -815,12 +815,12 @@ export default function GoalGantt() {
       {goals && goals.length === 0 ? (
         <p className="text-[#5a5a6e] text-center mt-12 text-sm">Create your first goal to get started</p>
       ) : (
-        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-hidden">
-          <div className="flex">
-            {/* Left: WBS table */}
+        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a]">
+          {/* Sticky header row */}
+          <div className="flex sticky top-0 z-20 bg-[#1e1e2a] border-b border-[#2a2a3a] rounded-t-xl">
+            {/* Left header */}
             <div className="w-[560px] shrink-0 border-r border-[#2a2a3a]">
-              {/* Table header - height matches gantt header rows */}
-              <div className={`flex items-center border-b border-[#2a2a3a] bg-[#1e1e2a] text-xs font-bold text-[#8b8b9e]`}
+              <div className={`flex items-center text-xs font-bold text-[#8b8b9e]`}
                 style={{ height: viewRange !== '1y' ? '52px' : '28px' }}>
                 <div className="w-7 flex items-center justify-center shrink-0">
                   <input type="checkbox"
@@ -835,8 +835,63 @@ export default function GoalGantt() {
                 <div className="w-12 text-center shrink-0">%</div>
                 <div className="w-20 shrink-0"></div>
               </div>
+            </div>
+            {/* Right header */}
+            <div ref={ganttAreaRef} className="flex-1 min-w-0 overflow-hidden">
+              {/* Month headers */}
+              <div className="h-7 relative border-b border-[#2a2a3a]">
+                {months.map((m, i) => (
+                  <div key={i} className="absolute top-0 bottom-0 flex items-center justify-center text-xs text-[#8b8b9e] font-medium"
+                    style={{ left: `${m.left * DAY_WIDTH}px`, width: `${m.width * DAY_WIDTH}px` }}>
+                    {m.label}
+                  </div>
+                ))}
+                {months.map((m, i) => i > 0 && (
+                  <div key={`mbl${i}`} className="absolute top-0 bottom-0 w-px bg-[#3a3a4a] pointer-events-none"
+                    style={{ left: `${m.left * DAY_WIDTH}px` }} />
+                ))}
+              </div>
+              {/* Sub-header: day/week labels */}
+              {viewRange !== '1y' && (
+                <div className="h-6 relative border-b border-[#2a2a3a] bg-[#1a1a28] flex">
+                  {viewRange === '1m' ? (
+                    dayTicks.map((t, i) => (
+                      <div key={i}
+                        className={`flex items-center justify-center text-[9px] border-r border-[#1f1f2e] shrink-0
+                          ${t.isWeekend ? 'text-[#5a5a6e] bg-[#13131d]' : 'text-[#7a7a90]'}
+                          ${t.isSunday ? 'text-red-400/60' : ''}`}
+                        style={{ width: `${DAY_WIDTH}px` }}>
+                        {t.label}
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      {labelTicks.map((t, i) => (
+                        <div key={`w${i}`}
+                          className="absolute top-0 bottom-0 flex items-center text-[9px] text-[#7a7a90] pointer-events-none"
+                          style={{ left: `${t.offset * DAY_WIDTH}px` }}>
+                          <div className="border-l border-[#1f1f2e] h-full" />
+                          {t.label && (
+                            <span className="ml-1 whitespace-nowrap">{t.label}</span>
+                          )}
+                        </div>
+                      ))}
+                      {months.map((m, i) => i > 0 && (
+                        <div key={`mb${i}`}
+                          className="absolute top-0 bottom-0 w-px bg-[#3a3a4a] pointer-events-none"
+                          style={{ left: `${m.left * DAY_WIDTH}px` }} />
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
-              {/* Rows */}
+          {/* Content rows */}
+          <div className="flex">
+            {/* Left: WBS table rows */}
+            <div className="w-[560px] shrink-0 border-r border-[#2a2a3a]">
               {flatList.map(node => {
                 const it = ISSUE_TYPES[node.issue_type]
                 const st = STATUSES[node.status]
@@ -956,61 +1011,8 @@ export default function GoalGantt() {
               })}
             </div>
 
-            {/* Right: Gantt chart area */}
-            <div ref={ganttAreaRef} className="flex-1 min-w-0 overflow-hidden">
-                {/* Month headers – absolute positioning to align with row grid */}
-                <div className="h-7 relative border-b border-[#2a2a3a] bg-[#1e1e2a]">
-                  {months.map((m, i) => (
-                    <div key={i} className="absolute top-0 bottom-0 flex items-center justify-center text-xs text-[#8b8b9e] font-medium"
-                      style={{ left: `${m.left * DAY_WIDTH}px`, width: `${m.width * DAY_WIDTH}px` }}>
-                      {m.label}
-                    </div>
-                  ))}
-                  {/* Month boundary lines */}
-                  {months.map((m, i) => i > 0 && (
-                    <div key={`mbl${i}`} className="absolute top-0 bottom-0 w-px bg-[#3a3a4a] pointer-events-none"
-                      style={{ left: `${m.left * DAY_WIDTH}px` }} />
-                  ))}
-                </div>
-
-                {/* Sub-header: day/week labels */}
-                {viewRange !== '1y' && (
-                  <div className="h-6 relative border-b border-[#2a2a3a] bg-[#1a1a28] flex">
-                    {viewRange === '1m' ? (
-                      // Daily cells
-                      dayTicks.map((t, i) => (
-                        <div key={i}
-                          className={`flex items-center justify-center text-[9px] border-r border-[#1f1f2e] shrink-0
-                            ${t.isWeekend ? 'text-[#5a5a6e] bg-[#13131d]' : 'text-[#7a7a90]'}
-                            ${t.isSunday ? 'text-red-400/60' : ''}`}
-                          style={{ width: `${DAY_WIDTH}px` }}>
-                          {t.label}
-                        </div>
-                      ))
-                    ) : (
-                      // Week ticks for 3m/6m + month boundaries
-                      <>
-                        {labelTicks.map((t, i) => (
-                          <div key={`w${i}`}
-                            className="absolute top-0 bottom-0 flex items-center text-[9px] text-[#7a7a90] pointer-events-none"
-                            style={{ left: `${t.offset * DAY_WIDTH}px` }}>
-                            <div className="border-l border-[#1f1f2e] h-full" />
-                            {t.label && (
-                              <span className="ml-1 whitespace-nowrap">{t.label}</span>
-                            )}
-                          </div>
-                        ))}
-                        {/* Month boundary lines (stronger) */}
-                        {months.map((m, i) => i > 0 && (
-                          <div key={`mb${i}`}
-                            className="absolute top-0 bottom-0 w-px bg-[#3a3a4a] pointer-events-none"
-                            style={{ left: `${m.left * DAY_WIDTH}px` }} />
-                        ))}
-                      </>
-                    )}
-                  </div>
-                )}
-
+            {/* Right: Gantt chart rows */}
+            <div className="flex-1 min-w-0 overflow-hidden">
                 {/* Gantt rows */}
                 <div className="relative">
                   {/* Today line */}
