@@ -34,15 +34,20 @@ router.patch('/:id', (req, res) => {
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
   const { title, price, url, deadline, memo, done } = req.body;
+  const newDone = done !== undefined ? done : existing.done;
+  const doneAt = done !== undefined
+    ? (done ? new Date().toISOString().split('T')[0] : null)
+    : existing.done_at;
   db.prepare(
-    'UPDATE wish_items SET title = ?, price = ?, url = ?, deadline = ?, memo = ?, done = ? WHERE id = ?'
+    'UPDATE wish_items SET title = ?, price = ?, url = ?, deadline = ?, memo = ?, done = ?, done_at = ? WHERE id = ?'
   ).run(
     title ?? existing.title,
     price !== undefined ? price : existing.price,
     url !== undefined ? url : existing.url,
     deadline !== undefined ? deadline : existing.deadline,
     memo !== undefined ? memo : existing.memo,
-    done !== undefined ? done : existing.done,
+    newDone,
+    doneAt,
     req.params.id
   );
 

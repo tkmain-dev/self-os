@@ -12,6 +12,7 @@ interface WishItem {
   deadline: string | null
   memo: string | null
   done: number
+  done_at: string | null
   sort_order: number
 }
 
@@ -149,6 +150,7 @@ export default function WishListPage() {
   const [dragId, setDragId] = useState<number | null>(null)
   const [dragOverId, setDragOverId] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [showDone, setShowDone] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   // Diary state
@@ -331,8 +333,10 @@ export default function WishListPage() {
     }
   }
 
-  const totalPrice = items?.filter(i => !i.done).reduce((s, i) => s + (i.price ?? 0), 0) ?? 0
-  const doneCount = items?.filter(i => i.done).length ?? 0
+  const activeItems = items?.filter(i => !i.done) ?? []
+  const doneItems = items?.filter(i => !!i.done) ?? []
+  const totalPrice = activeItems.reduce((s, i) => s + (i.price ?? 0), 0)
+  const doneCount = doneItems.length
   const totalCount = items?.length ?? 0
 
   return (
@@ -458,9 +462,9 @@ export default function WishListPage() {
           </div>
         )}
 
-        {/* Item List */}
+        {/* Item List (active only) */}
         <div className="flex flex-col gap-2">
-          {items?.map(item => {
+          {activeItems.map(item => {
             const dl = daysUntil(item.deadline)
             const isDragging = dragId === item.id
             const isDragOver = dragOverId === item.id
@@ -483,9 +487,7 @@ export default function WishListPage() {
                     ? 'border-amber-500/30 shadow-lg shadow-amber-500/5'
                     : 'border-teal-500/30 shadow-lg shadow-teal-500/5'
                   : theme.cardBorder
-                } ${
-                  item.done ? 'opacity-50' : theme.cardHover
-                }`}
+                } ${theme.cardHover}`}
               >
                 <div className="flex items-start gap-3 p-4">
                   <span
@@ -651,7 +653,7 @@ export default function WishListPage() {
             )
           })}
 
-          {items && items.length === 0 && !showForm && (
+          {items && activeItems.length === 0 && doneItems.length === 0 && !showForm && (
             <div className={`text-center py-20 ${activeTab === 'wish' ? 'text-amber-500/15' : 'text-teal-500/15'}`}>
               <div className="text-6xl mb-4">{theme.emptyIcon}</div>
               <p className={`text-base font-medium mb-1 ${activeTab === 'wish' ? 'text-amber-400/40' : 'text-teal-400/40'}`}>
@@ -663,6 +665,59 @@ export default function WishListPage() {
             </div>
           )}
         </div>
+
+        {/* Done items archive — grouped by done_at date, newest first */}
+        {doneItems.length > 0 && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowDone(v => !v)}
+              className="flex items-center gap-2 text-xs text-[#5a5a6e] hover:text-[#8b8b9e] transition-colors mb-2 px-1"
+            >
+              <svg className={`w-3 h-3 transition-transform duration-200 ${showDone ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+              完了済み ({doneCount})
+            </button>
+            {showDone && (() => {
+              const sorted = [...doneItems].sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''))
+              const groups: { date: string; items: WishItem[] }[] = []
+              for (const item of sorted) {
+                const key = item.done_at ?? '不明'
+                const last = groups[groups.length - 1]
+                if (last && last.date === key) { last.items.push(item) }
+                else { groups.push({ date: key, items: [item] }) }
+              }
+              return (
+                <div className="space-y-3">
+                  {groups.map(group => (
+                    <div key={group.date}>
+                      <div className="text-[10px] text-[#3a3a4e] font-mono px-1 mb-1">
+                        {group.date === '不明' ? '日付不明' : group.date}
+                      </div>
+                      <div className="space-y-1">
+                        {group.items.map(item => (
+                          <div key={item.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#12121a] border border-[#1e1e2a]">
+                            <button
+                              onClick={() => handleToggleDone(item)}
+                              className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${theme.checkDone} text-black`}
+                              title="完了を取り消す"
+                            >
+                              <span className="text-[9px] leading-none">✓</span>
+                            </button>
+                            <span className="text-xs text-[#5a5a6e] line-through truncate flex-1">{item.title}</span>
+                            {item.price !== null && activeTab === 'wish' && (
+                              <span className="text-[10px] text-[#3a3a4e]">{formatPrice(item.price)}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )}
       </div>
 
       {/* ── Right: Diary panel (appears during create/edit) ── */}
