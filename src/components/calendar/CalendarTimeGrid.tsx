@@ -12,8 +12,8 @@ interface CalendarTimeGridProps {
 
 // Timeline constants (same as DailyPage)
 const HOUR_HEIGHT = 48
-const START_HOUR = 7
-const END_HOUR = 27 // 翌3:00 (7:00〜翌3:00 = 20時間)
+const START_HOUR = 6
+const END_HOUR = 25 // 翌1:00 (6:00〜翌1:00 = 19時間, 生活時間7:00〜24:00+バッファ)
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT
 const TIME_LABEL_WIDTH = 48
@@ -263,8 +263,19 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
             <div
               className="fixed z-50 w-52"
               style={{ top: `${routinePopover.y}px`, left: `${routinePopover.x}px` }}
+              ref={(el) => {
+                if (!el) return
+                const r = el.getBoundingClientRect()
+                const safeBottom = window.innerHeight - 60
+                if (r.bottom > safeBottom) {
+                  el.style.top = `${Math.max(8, routinePopover.y - (r.bottom - safeBottom))}px`
+                }
+                if (r.right > window.innerWidth - 8) {
+                  el.style.left = `${window.innerWidth - r.width - 8}px`
+                }
+              }}
             >
-              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm">
+              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm max-h-[calc(100vh-120px)]">
                 <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2 bg-teal-500/5">
                   <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
                   <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
@@ -272,7 +283,7 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
                     {routine.start_time}-{routine.end_time}
                   </span>
                 </div>
-                <div className="px-3 py-2.5">
+                <div className="px-3 py-2.5 overflow-y-auto max-h-[calc(100vh-180px)]">
                   <div className="text-[10px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
                     {routine.memo}
                   </div>

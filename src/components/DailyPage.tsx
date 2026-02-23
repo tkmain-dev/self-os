@@ -44,8 +44,8 @@ function formatDateLabel(dateStr: string): string {
 
 // ── Timeline constants ──
 const HOUR_HEIGHT = 48
-const START_HOUR = 7
-const END_HOUR = 27 // 翌3:00 (7:00〜翌3:00 = 20時間)
+const START_HOUR = 6
+const END_HOUR = 25 // 翌1:00 (6:00〜翌1:00 = 19時間, 生活時間7:00〜24:00+バッファ)
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i)
 
 // Convert HH:MM to grid minutes (early morning hours map to extended range)
@@ -101,7 +101,7 @@ export default function DailyPage() {
         <MonthlyGoalBadge />
       </div>
 
-      <WeeklyGoalSection />
+      <WeeklyGoalSection date={date} />
 
       {/* Two-column layout – stacks on narrow, side-by-side on wide */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -527,8 +527,19 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
             <div
               className="fixed z-50 w-56"
               style={{ top: `${routinePopover.y}px`, left: `${routinePopover.x}px` }}
+              ref={(el) => {
+                if (!el) return
+                const r = el.getBoundingClientRect()
+                const safeBottom = window.innerHeight - 60 // タスクバー余白
+                if (r.bottom > safeBottom) {
+                  el.style.top = `${Math.max(8, routinePopover.y - (r.bottom - safeBottom))}px`
+                }
+                if (r.right > window.innerWidth - 8) {
+                  el.style.left = `${window.innerWidth - r.width - 8}px`
+                }
+              }}
             >
-              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm">
+              <div className="bg-[#1a1a2e] border border-teal-500/30 rounded-xl shadow-2xl shadow-teal-500/10 overflow-hidden backdrop-blur-sm max-h-[calc(100vh-120px)]">
                 <div className="px-3 py-2 border-b border-teal-500/15 flex items-center gap-2 bg-teal-500/5">
                   <div className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
                   <span className="text-xs font-semibold text-teal-300 truncate">{routine.name}</span>
@@ -536,7 +547,7 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
                     {routine.start_time}-{routine.end_time}
                   </span>
                 </div>
-                <div className="px-3 py-2.5">
+                <div className="px-3 py-2.5 overflow-y-auto max-h-[calc(100vh-180px)]">
                   <div className="text-[11px] text-[#b0b0c0] leading-relaxed whitespace-pre-wrap">
                     {routine.memo}
                   </div>
@@ -1117,29 +1128,26 @@ function MonthlyGoalBadge() {
 // ══════════════════════════════════════
 // Weekly Goal Section
 // ══════════════════════════════════════
-function getISOWeekString(d: Date): string {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-  const weekNo = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
-}
-
+// Sunday-Saturday week range from any date
 function getWeekRange(d: Date): { start: Date; end: Date } {
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
   const start = new Date(d)
-  start.setDate(d.getDate() + diff)
+  start.setDate(d.getDate() - d.getDay()) // Sunday
   const end = new Date(start)
-  end.setDate(start.getDate() + 6)
+  end.setDate(start.getDate() + 6) // Saturday
   return { start, end }
 }
 
-function WeeklyGoalSection() {
-  const now = new Date()
-  const yearWeek = getISOWeekString(now)
-  const { start, end } = getWeekRange(now)
-  const weekLabel = `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`
+// Week key based on Sunday's date (e.g. "2026-02-22")
+function getWeekKey(d: Date): string {
+  const { start } = getWeekRange(d)
+  return formatDate(start)
+}
+
+function WeeklyGoalSection({ date }: { date: string }) {
+  const current = new Date(date + 'T00:00:00')
+  const weekKey = getWeekKey(current)
+  const { start, end } = getWeekRange(current)
+  const weekLabel = `${start.getMonth() + 1}/${start.getDate()}（日）- ${end.getMonth() + 1}/${end.getDate()}（土）`
 
   const [content, setContent] = useState('')
   const [memo, setMemo] = useState<string | null>(null)
@@ -1151,10 +1159,12 @@ function WeeklyGoalSection() {
   const memoRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    fetch(`/api/weekly-goals/${yearWeek}`)
+    setEditing(false)
+    setExpanded(false)
+    fetch(`/api/weekly-goals/${weekKey}`)
       .then(r => r.json())
       .then(d => { setContent(d.content ?? ''); setMemo(d.memo ?? null) })
-  }, [yearWeek])
+  }, [weekKey])
 
   const startEdit = () => {
     setDraft(content)
@@ -1166,7 +1176,7 @@ function WeeklyGoalSection() {
   const save = async () => {
     const trimmedContent = draft.trim()
     const trimmedMemo = draftMemo.trim() || null
-    await apiPut(`/api/weekly-goals/${yearWeek}`, { content: trimmedContent, memo: trimmedMemo })
+    await apiPut(`/api/weekly-goals/${weekKey}`, { content: trimmedContent, memo: trimmedMemo })
     setContent(trimmedContent)
     setMemo(trimmedMemo)
     setEditing(false)
@@ -1187,7 +1197,7 @@ function WeeklyGoalSection() {
             <svg className="w-4 h-4 text-amber-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
             </svg>
-            <span className="text-[10px] text-amber-500/40 font-mono tracking-widest uppercase">WEEK {yearWeek.split('-W')[1]}</span>
+            <span className="text-[10px] text-amber-500/40 font-mono tracking-widest uppercase">WEEKLY GOAL</span>
             <span className="text-[10px] text-[#3a3a4e]">{weekLabel}</span>
             <div className="ml-auto flex gap-1.5">
               <button onClick={save} className="px-2.5 py-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 rounded-md transition-colors">保存</button>
@@ -1234,7 +1244,7 @@ function WeeklyGoalSection() {
           <svg className="w-4 h-4 text-amber-400/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
           </svg>
-          <span className="text-[10px] text-amber-500/35 font-mono tracking-widest uppercase shrink-0">W{yearWeek.split('-W')[1]}</span>
+          <span className="text-[10px] text-amber-500/35 font-mono tracking-widest shrink-0">{weekLabel}</span>
           {content ? (
             <span className="text-sm font-semibold tracking-tight text-amber-300/80 truncate min-w-0 select-none">
               {content}
