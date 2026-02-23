@@ -121,6 +121,92 @@ export default function DailyPage() {
 }
 
 // ══════════════════════════════════════
+// Schedule Create Modal (click-on-timeline)
+// ══════════════════════════════════════
+interface ScheduleCreateModalProps {
+  date: string
+  defaultStartTime: string
+  defaultEndTime: string
+  onClose: () => void
+  onSaved: () => void
+}
+
+function ScheduleCreateModal({ date, defaultStartTime, defaultEndTime, onClose, onSaved }: ScheduleCreateModalProps) {
+  const [title, setTitle] = useState('')
+  const [st, setSt] = useState(defaultStartTime)
+  const [et, setEt] = useState(defaultEndTime)
+  const [memo, setMemo] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title.trim() || submitting) return
+    setSubmitting(true)
+    await apiPost('/api/schedules', {
+      title: title.trim(), date,
+      start_time: st || null,
+      end_time: et || null,
+      memo: memo || null,
+    })
+    onSaved()
+  }
+
+  const inputClass = 'w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] outline-none focus:border-amber-500/40 transition-colors'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <form onSubmit={handleSubmit}
+        className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] w-full max-w-md mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-3 border-b border-[#2a2a3a] flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-amber-400" />
+          <h3 className="text-sm font-bold text-[#e4e4ec]">スケジュール作成</h3>
+          <span className="text-[10px] text-[#5a5a6e] font-mono ml-auto">{date}</span>
+        </div>
+        {/* Body */}
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-1.5">タイトル</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="予定名を入力" className={inputClass} autoFocus />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-1.5">開始</label>
+              <input type="time" value={st} onChange={e => setSt(e.target.value)} className={inputClass} />
+            </div>
+            <span className="self-end pb-2 text-[#5a5a6e]">–</span>
+            <div className="flex-1">
+              <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-1.5">終了</label>
+              <input type="time" value={et} onChange={e => setEt(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-1.5">メモ</label>
+            <textarea value={memo} onChange={e => setMemo(e.target.value)} rows={2}
+              placeholder="メモ（任意）" className={inputClass + ' resize-none'} />
+          </div>
+        </div>
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-[#2a2a3a] flex justify-end gap-2">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm text-[#8b8b9e] hover:bg-[#252535] transition-colors">キャンセル</button>
+          <button type="submit" disabled={!title.trim() || submitting}
+            className="bg-amber-500 text-black font-semibold px-5 py-2 rounded-lg text-sm hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed">作成</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════
 // Schedule Timeline
 // ══════════════════════════════════════
 interface GoalItem {
@@ -183,6 +269,10 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   // Routine popover
   const [routinePopover, setRoutinePopover] = useState<{ id: number; x: number; y: number } | null>(null)
 
+  // Click-to-create modal
+  const [createModal, setCreateModal] = useState<{ startTime: string; endTime: string } | null>(null)
+  const mouseDownRef = useRef<{ x: number; y: number } | null>(null)
+
   const fetchSchedules = useCallback(() => {
     setLoading(true)
     const dateDay = new Date(date + 'T00:00:00').getDay()
@@ -231,6 +321,22 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
   }
 
   // Habit D&D handlers
+  const handleTimelineClick = (e: React.MouseEvent) => {
+    if (dragging) return
+    if (mouseDownRef.current) {
+      const dx = e.clientX - mouseDownRef.current.x
+      const dy = e.clientY - mouseDownRef.current.y
+      if (Math.sqrt(dx * dx + dy * dy) > 5) return
+    }
+    const rect = timelineRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const y = e.clientY - rect.top
+    const minutes = START_HOUR * 60 + (y / HOUR_HEIGHT) * 60
+    const snapped = Math.round(minutes / 15) * 15
+    const clampedMin = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - 60, snapped))
+    setCreateModal({ startTime: gridMinutesToTime(clampedMin), endTime: gridMinutesToTime(clampedMin + 60) })
+  }
+
   const handleHabitDragOver = (e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes('habit-id')) return
     e.preventDefault()
@@ -394,7 +500,9 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
         <p className="text-[#5a5a6e] text-sm">読み込み中...</p>
       ) : (
         <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] overflow-hidden">
-          <div ref={timelineRef} className="relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}
+          <div ref={timelineRef} className="relative cursor-pointer" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}
+            onMouseDown={e => { mouseDownRef.current = { x: e.clientX, y: e.clientY } }}
+            onClick={handleTimelineClick}
             onDragOver={handleHabitDragOver}
             onDragLeave={() => setDropIndicator(null)}
             onDrop={handleHabitDrop}>
@@ -512,6 +620,17 @@ function ScheduleTimeline({ date, isToday }: { date: string; isToday: boolean })
             )}
           </div>
         </div>
+      )}
+
+      {/* Schedule creation modal */}
+      {createModal && (
+        <ScheduleCreateModal
+          date={date}
+          defaultStartTime={createModal.startTime}
+          defaultEndTime={createModal.endTime}
+          onClose={() => setCreateModal(null)}
+          onSaved={() => { setCreateModal(null); fetchSchedules() }}
+        />
       )}
 
       {/* Routine popover — rendered outside overflow-hidden container */}

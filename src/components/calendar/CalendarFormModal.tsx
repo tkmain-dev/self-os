@@ -6,6 +6,8 @@ interface CalendarFormModalProps {
   mode: 'schedule' | 'goal'
   editItem: ScheduleItem | GoalItem | null  // null = new
   prefilledDate: string | null
+  prefilledStartTime?: string | null
+  prefilledEndTime?: string | null
   onClose: () => void
   onSaved: () => void
 }
@@ -47,15 +49,15 @@ function formatDateToday(): string {
   return d.toISOString().split('T')[0]
 }
 
-export default function CalendarFormModal({ mode: initialMode, editItem, prefilledDate, onClose, onSaved }: CalendarFormModalProps) {
+export default function CalendarFormModal({ mode: initialMode, editItem, prefilledDate, prefilledStartTime, prefilledEndTime, onClose, onSaved }: CalendarFormModalProps) {
   const isEdit = editItem !== null
   const [mode, setMode] = useState<'schedule' | 'goal'>(initialMode)
 
   // Schedule fields
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(prefilledDate ?? formatDateToday())
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
+  const [startTime, setStartTime] = useState(prefilledStartTime ?? '')
+  const [endTime, setEndTime] = useState(prefilledEndTime ?? '')
   const [memo, setMemo] = useState('')
 
   // Goal fields

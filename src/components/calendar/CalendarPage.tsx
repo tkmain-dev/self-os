@@ -45,6 +45,8 @@ export default function CalendarPage() {
   const [modalMode, setModalMode] = useState<'schedule' | 'goal'>('schedule')
   const [editItem, setEditItem] = useState<ScheduleItem | GoalItem | null>(null)
   const [prefilledDate, setPrefilledDate] = useState<string | null>(null)
+  const [prefilledStartTime, setPrefilledStartTime] = useState<string | null>(null)
+  const [prefilledEndTime, setPrefilledEndTime] = useState<string | null>(null)
 
   // Refetch both data sources
   const refetchAll = useCallback(() => {
@@ -72,14 +74,20 @@ export default function CalendarPage() {
   // Date click → open schedule creation modal
   const handleDateClick = useCallback((dateStr: string) => {
     setPrefilledDate(dateStr)
+    setPrefilledStartTime(null)
+    setPrefilledEndTime(null)
     setModalMode('schedule')
     setEditItem(null)
     setShowModal(true)
   }, [])
 
   // Time slot click → open schedule creation modal with time
-  const handleSlotClick = useCallback((dateStr: string, _time: string) => {
+  const handleSlotClick = useCallback((dateStr: string, time: string) => {
     setPrefilledDate(dateStr)
+    setPrefilledStartTime(time)
+    const [h, m] = time.split(':').map(Number)
+    const endMin = h * 60 + m + 60
+    setPrefilledEndTime(`${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`)
     setModalMode('schedule')
     setEditItem(null)
     setShowModal(true)
@@ -155,6 +163,8 @@ export default function CalendarPage() {
           mode={modalMode}
           editItem={editItem}
           prefilledDate={prefilledDate}
+          prefilledStartTime={prefilledStartTime}
+          prefilledEndTime={prefilledEndTime}
           onClose={() => { setShowModal(false); setEditItem(null) }}
           onSaved={handleSaved}
         />
