@@ -119,10 +119,24 @@ export default function DailyPage() {
 
   return (
     <div>
-      {/* Date header */}
-      <div className="flex items-center gap-2 mb-3 md:mb-4">
+      {/* ── Desktop date header (original style) ── */}
+      <div className="hidden md:flex items-center gap-3 mb-6">
+        <button onClick={() => changeDate(-1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&larr;</button>
+        <h2 className="techo-heading text-2xl min-w-[200px] text-center">{formatDateLabel(date)}</h2>
+        <button onClick={() => changeDate(1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&rarr;</button>
+        <button
+          onClick={() => setDate(formatDate(new Date()))}
+          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${isToday ? 'bg-amber-500 text-black font-semibold' : 'bg-[#1e1e2a] text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'}`}
+        >
+          今日
+        </button>
+        <MonthlyGoalBadge date={date} />
+      </div>
+
+      {/* ── Mobile date header ── */}
+      <div className="flex md:hidden items-center gap-2 mb-3">
         <button onClick={() => changeDate(-1)} className="px-2.5 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors text-sm">&larr;</button>
-        <h2 className="techo-heading text-sm md:text-2xl flex-1 text-center">{formatDateLabel(date)}</h2>
+        <h2 className="techo-heading text-sm flex-1 text-center">{formatDateLabel(date)}</h2>
         <button onClick={() => changeDate(1)} className="px-2.5 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors text-sm">&rarr;</button>
         <button
           onClick={() => setDate(formatDate(new Date()))}
@@ -130,11 +144,6 @@ export default function DailyPage() {
         >
           今日
         </button>
-      </div>
-
-      {/* Monthly goal — desktop only in header row */}
-      <div className="hidden md:block mb-2">
-        <MonthlyGoalBadge date={date} />
       </div>
 
       {/* ── Mobile layout: accordion ── */}
