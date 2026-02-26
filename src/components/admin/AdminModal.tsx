@@ -284,7 +284,7 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
         {/* ── Center: Active Feature Requests ── */}
         <div
-          className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden flex flex-col flex-1 min-w-0"
+          className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden flex flex-col flex-1 min-w-0 md:min-w-[440px]"
           style={{
             maxWidth: isEditMode ? '540px' : '640px',
             transition: 'max-width 0.4s cubic-bezier(0.4,0,0.2,1)',
