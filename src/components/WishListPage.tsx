@@ -502,7 +502,7 @@ export default function WishListPage() {
                         : `border-[#3a3a4a] ${theme.checkHover}`
                     }`}
                   >
-                    {item.done && <span className="text-[10px] leading-none">✓</span>}
+                    {!!item.done && <span className="text-[10px] leading-none">✓</span>}
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
