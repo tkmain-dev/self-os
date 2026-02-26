@@ -13,6 +13,7 @@ const nav = [
   { to: '/calendar', label: 'カレンダー', icon: '▨' },
   { to: '/goals', label: '目標管理', icon: '◫' },
   { to: '/wishlist', label: 'ウィッシュ', icon: '✦' },
+  { to: '/budget', label: '家計簿', icon: '¥' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

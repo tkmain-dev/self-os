@@ -10,6 +10,7 @@ import wishItemsRouter from './routes/wishItems';
 import monthlyGoalsRouter from './routes/monthlyGoals';
 import routinesRouter from './routes/routines';
 import weeklyGoalsRouter from './routes/weeklyGoals';
+import budgetRouter from './routes/budget';
 
 const app = express();
 const PORT = 3001;
@@ -27,6 +28,7 @@ app.use('/api/wish-items', wishItemsRouter);
 app.use('/api/monthly-goals', monthlyGoalsRouter);
 app.use('/api/routines', routinesRouter);
 app.use('/api/weekly-goals', weeklyGoalsRouter);
+app.use('/api/budget', budgetRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

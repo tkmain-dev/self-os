@@ -20,6 +20,7 @@
 | Feature Request | `/api/feature-requests` | `server/routes/featureRequests.ts` |
 | ウィッシュアイテム | `/api/wish-items` | `server/routes/wishItems.ts` |
 | 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
+| 家計簿 | `/api/budget` | `server/routes/budget.ts` |
 
 ---
 
@@ -358,6 +359,48 @@ Feature Request を削除。**レスポンス**: `204`
 
 **リクエスト**: `{ "content": "今月の目標テキスト" }`
 **レスポンス**: `200`（更新後のレコード）
+
+---
+
+## 家計簿 API (`/api/budget`)
+
+月次の支払い管理（追加振込シート）。年月キーで upsert 管理。
+
+### GET `/api/budget`
+直近24ヶ月のエントリー一覧を返す。
+
+**レスポンス**: `200`（配列）
+
+### GET `/api/budget/:yearMonth`
+指定年月のエントリーを取得。存在しない場合はデフォルト値（全フィールド null）を返す。
+
+**パラメータ**: `yearMonth` — YYYY-MM（例: `2026-01`）
+
+### PUT `/api/budget/:yearMonth`
+指定年月のエントリーを保存・更新（UPSERT）。
+
+**リクエスト**:
+```json
+{
+  "au_pay": 25444,
+  "mufg_billing": 19339,
+  "jcb_billing": 275649,
+  "minsin_balance": 170000,
+  "mufg_balance": 153659,
+  "jcb_skip": 0
+}
+```
+**レスポンス**: `200`（更新後のレコード）
+
+**計算ロジック（フロントエンド側）**:
+```
+合計請求額 = au_pay + mufg_billing + jcb_billing
+総額       = minsin_balance + mufg_balance
+要調整額   = 総額 - 合計請求額  ← 負なら不足
+JCB実請求  = jcb_billing - jcb_skip
+最終請求額 = au_pay + mufg_billing + JCB実請求
+余剰金額   = 総額 - 最終請求額
+```
 
 ---
 

@@ -156,6 +156,19 @@ WBS ベースのガントチャートで目標を階層管理する。最も複�
 | `calendarTypes.ts` | 型定義（ScheduleItem, GoalItem, CalendarEvent, BandSegment（epicTitle/storyTitle付き）） |
 | `calendarUtils.ts` | ユーティリティ関数（collectLeaves で葉タスク抽出 + Epic/Story 祖先情報） |
 
+### BudgetPage.tsx
+
+月次支払い管理ページ（`/budget`）。Excelの「追加振込シート」をアプリ化。
+
+- **月ナビゲーション**: 前月・翌月ボタン、「今月」ジャンプ
+- **4セクション構成**（入力フィールドはフォーカスアウトで自動保存）:
+  1. **請求額**: AuPay / MUFG / JCB 入力 → 合計請求額（自動計算）
+  2. **口座残高**: みん銀 / MUFG 入力 → 総額（自動計算）
+  3. **JCBスキップ調整**: 要調整額（自動）/ スキップ金額（入力）/ JCB実請求額（自動）
+  4. **最終決済額**: 請求額・口座残高・余剰金額（全自動計算）
+- **アラート表示**: 不足時は赤バナー（要スキップ額表示）、余剰時は緑バナー
+- `/api/budget/:yearMonth` に PUT で upsert 保存
+
 ### WishListPage.tsx
 
 「買いたいもの」と「やりたいこと」の2タブ管理ページ。

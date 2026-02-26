@@ -4,6 +4,7 @@ import DailyPage from './components/DailyPage'
 import CalendarPage from './components/calendar/CalendarPage'
 import GoalGantt from './components/GoalGantt'
 import WishListPage from './components/WishListPage'
+import BudgetPage from './components/BudgetPage'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/goals" element={<GoalGantt />} />
         <Route path="/wishlist" element={<WishListPage />} />
+        <Route path="/budget" element={<BudgetPage />} />
       </Routes>
     </Layout>
   )
