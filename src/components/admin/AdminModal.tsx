@@ -220,13 +220,68 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
       onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
       <div
-        className="flex gap-2 mx-4 max-h-[90vh] max-w-[calc(100vw-2rem)]"
+        className="flex gap-2 mx-4 max-h-[90vh] max-w-[calc(100vw-2rem)] md:max-w-5xl"
         style={{
           opacity: animateIn ? 1 : 0,
           transform: animateIn ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
           transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
+        {/* ── Left: Completed items (desktop only) ── */}
+        {activeTab === 'feature-requests' && (
+          <div className="hidden md:flex flex-col bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden w-52 shrink-0">
+            <div className="px-4 pt-4 pb-3 border-b border-[#2a2a3a] shrink-0">
+              <span className="text-xs text-[#5a5a6e] font-medium">完了済み ({completedItems.length})</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {completedItems.length === 0 && (
+                <p className="text-xs text-[#3a3a4e] italic px-2 py-3">なし</p>
+              )}
+              {completedItems.map(item => {
+                const isSelected = selectedCompletedId === item.id
+                const isRejected = item.status === 'rejected'
+                return (
+                  <div key={item.id} className="rounded-lg border border-[#1e1e2a] bg-[#0a0a10] overflow-hidden">
+                    <button
+                      onClick={() => setSelectedCompletedId(isSelected ? null : item.id)}
+                      className="w-full text-left flex items-center gap-2 px-2 py-2 hover:bg-[#12121a] transition-colors"
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isRejected ? 'bg-red-500/40' : 'bg-emerald-500/40'}`} />
+                      <span className="text-xs text-[#8b8b9e] truncate flex-1">{item.title}</span>
+                    </button>
+                    {isSelected && (
+                      <div className="px-2 pb-2 pt-1.5 border-t border-[#1e1e2a]">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <select
+                            value={item.status}
+                            onChange={e => {
+                              const newStatus = e.target.value as FeatureRequest['status']
+                              handleUpdate(item.id, { status: newStatus })
+                              if (newStatus !== 'done' && newStatus !== 'rejected') setSelectedCompletedId(null)
+                            }}
+                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer appearance-none text-center border-0 focus:outline-none focus:ring-1 focus:ring-amber-500/30 ${
+                              (STATUS_OPTIONS.find(s => s.value === item.status) ?? STATUS_OPTIONS[0]).color
+                            }`}
+                          >
+                            {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          </select>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="text-[10px] text-[#3a3a4e] hover:text-red-400 transition-colors"
+                          >削除</button>
+                        </div>
+                        {item.commit_message && (
+                          <pre className="text-[9px] text-emerald-500/50 whitespace-pre-wrap font-mono leading-relaxed break-all">{item.commit_message}</pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Center: Active Feature Requests ── */}
         <div
           className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden flex flex-col flex-1 min-w-0"
@@ -341,9 +396,9 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
                 />
               ))}
 
-              {/* ── Completed items (collapsible) ── */}
+              {/* ── Completed items (collapsible, mobile only) ── */}
               {completedItems.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-[#1e1e2a]">
+                <div className="md:hidden mt-4 pt-4 border-t border-[#1e1e2a]">
                   <button
                     onClick={() => setShowCompleted(v => !v)}
                     className="flex items-center gap-2 w-full text-left text-xs text-[#5a5a6e] hover:text-[#8b8b9e] transition-colors mb-2"
