@@ -95,7 +95,8 @@ export default function CalendarWeekView({
   const hasAllDay = bandsHeight > 0 || allDaySchedules.length > 0
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="flex flex-col gap-0 min-w-[560px]">
       {/* All-day banner with nested bands */}
       {hasAllDay && (
         <div className="bg-[#1e1e2a] border-b border-[#2a2a3a]">
@@ -149,6 +150,7 @@ export default function CalendarWeekView({
         onSlotClick={onSlotClick}
         onEventClick={onEventClick}
       />
+    </div>
     </div>
   )
 }

@@ -42,7 +42,7 @@ export default function CalendarHeader({ view, onViewChange, anchorDate, onNavig
   return (
     <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
       {/* Left: Title */}
-      <h2 className="techo-heading text-2xl min-w-[180px]">
+      <h2 className="techo-heading text-lg md:text-2xl">
         {formatTitle(view, anchorDate)}
       </h2>
 

@@ -899,7 +899,8 @@ export default function GoalGantt() {
       {goals && goals.length === 0 ? (
         <p className="text-[#5a5a6e] text-center mt-12 text-sm">Create your first goal to get started</p>
       ) : (
-        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a]">
+        <div className="overflow-x-auto -mx-1 px-1">
+        <div className="bg-[#16161e] rounded-xl shadow-lg border border-[#2a2a3a] min-w-[760px]">
           {/* Sticky header row */}
           <div className="flex sticky top-0 z-20 bg-[#1e1e2a] border-b border-[#2a2a3a] rounded-t-xl">
             {/* Left header */}
@@ -1264,6 +1265,7 @@ export default function GoalGantt() {
                 </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

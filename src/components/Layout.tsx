@@ -21,7 +21,8 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen">
-      <aside className="sidebar w-52 p-5 flex flex-col shadow-2xl">
+      {/* ── Desktop sidebar ── */}
+      <aside className="sidebar w-52 p-5 flex-col shadow-2xl hidden md:flex">
         <h1 className="text-xl font-bold mb-0.5 text-white tracking-[0.25em]">手 帳</h1>
         <div className="w-10 h-0.5 bg-amber-500 mb-2" />
         <p className="text-xs text-[#8b8b9e] mb-8 tracking-wide">{today()}</p>
@@ -42,9 +43,35 @@ export default function Layout({ children }: { children: ReactNode }) {
           <GearButton onClick={() => setAdminOpen(true)} />
         </div>
       </aside>
-      <main className="page-area flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+
+      {/* ── Mobile top header ── */}
+      <div className="mobile-header md:hidden">
+        <h1 className="text-base font-bold text-white tracking-[0.2em]">手 帳</h1>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-[#8b8b9e]">{today()}</span>
+          <GearButton onClick={() => setAdminOpen(true)} />
+        </div>
+      </div>
+
+      {/* ── Main content ── */}
+      <main className="page-area flex-1 overflow-auto p-4 md:p-6 lg:p-8 pt-[52px] pb-[64px] md:pt-4 md:pb-4">
         {children}
       </main>
+
+      {/* ── Mobile bottom nav ── */}
+      <nav className="mobile-bottom-nav md:hidden">
+        {nav.map(n => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="text-lg leading-none">{n.icon}</span>
+            <span>{n.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
       <AdminModal open={adminOpen} onClose={() => setAdminOpen(false)} />
     </div>
   )

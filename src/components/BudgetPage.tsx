@@ -92,7 +92,7 @@ function AmountInput({
           onChange={e => setRaw(e.target.value)}
           onBlur={handleBlur}
           placeholder={placeholder}
-          className={`w-36 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pl-6 pr-3 py-1.5 text-sm text-right text-white placeholder-[#3a3a4a] ${accentMap[accent]} focus:outline-none transition-colors`}
+          className={`w-28 md:w-36 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pl-6 pr-3 py-1.5 text-sm text-right text-white placeholder-[#3a3a4a] ${accentMap[accent]} focus:outline-none transition-colors`}
         />
       </div>
     </div>
