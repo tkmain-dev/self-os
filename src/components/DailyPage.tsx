@@ -98,7 +98,7 @@ export default function DailyPage() {
         >
           今日
         </button>
-        <MonthlyGoalBadge />
+        <MonthlyGoalBadge date={date} />
       </div>
 
       <WeeklyGoalSection date={date} />
@@ -1166,9 +1166,9 @@ function HabitSection({ date }: { date: string }) {
 // ══════════════════════════════════════
 // Monthly Goal Badge — compact header inline
 // ══════════════════════════════════════
-function MonthlyGoalBadge() {
-  const now = new Date()
-  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+function MonthlyGoalBadge({ date }: { date: string }) {
+  const d = new Date(date + 'T00:00:00')
+  const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   const [content, setContent] = useState('')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -1202,7 +1202,7 @@ function MonthlyGoalBadge() {
     return (
       <div className="flex-1 flex items-center gap-2 min-w-0">
         <span className="text-[10px] text-amber-500/40 shrink-0 font-mono tracking-widest uppercase">
-          {now.getMonth() + 1}月
+          {d.getMonth() + 1}月
         </span>
         <input
           ref={inputRef}
@@ -1221,7 +1221,7 @@ function MonthlyGoalBadge() {
   return (
     <div className="flex-1 flex items-center gap-2 min-w-0 group">
       <span className="text-[10px] text-amber-500/30 shrink-0 font-mono tracking-widest uppercase">
-        {now.getMonth() + 1}月
+        {d.getMonth() + 1}月
       </span>
       {content ? (
         <span className="text-base font-bold tracking-tight text-amber-300/80 truncate min-w-0 select-none">

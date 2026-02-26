@@ -75,7 +75,12 @@ const COLOR_MAP: Record<string, { bg: string; bar: string; text: string }> = {
 const COLORS = Object.keys(COLOR_MAP)
 
 // ── Date utilities ──
-const formatDate = (d: Date) => d.toISOString().split('T')[0]
+const formatDate = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00')
