@@ -20,6 +20,8 @@ interface Goal {
   sort_order: number
   scheduled_time: string | null
   scheduled_duration: number | null
+  milestone_date: string | null
+  milestone_label: string | null
 }
 
 interface TreeNode extends Goal {
@@ -333,6 +335,8 @@ export default function GoalGantt() {
   const [endDate, setEndDate] = useState(addDays(formatDate(new Date()), 30))
   const [color, setColor] = useState('amber')
   const [memo, setMemo] = useState('')
+  const [milestoneDate, setMilestoneDate] = useState('')
+  const [milestoneLabel, setMilestoneLabel] = useState('')
 
   const view = useMemo(() => getViewDates(viewRange, offset), [viewRange, offset])
   const todayStr = formatDate(new Date())
@@ -389,6 +393,54 @@ export default function GoalGantt() {
   // For 1m view, all ticks are both labels and potentially weekends
   const dayTicks = useMemo(() => viewRange === '1m' ? subTicks : [], [viewRange, subTicks])
 
+  // Precompute epic ancestor for each goal (memoized up-traversal)
+  const epicAncestorOf = useMemo(() => {
+    if (!goals) return new Map<number, number | null>()
+    const goalMap = new Map(goals.map(g => [g.id, g]))
+    const cache = new Map<number, number | null>()
+    const find = (id: number): number | null => {
+      if (cache.has(id)) return cache.get(id)!
+      const g = goalMap.get(id)
+      if (!g) { cache.set(id, null); return null }
+      if (g.issue_type === 'epic') { cache.set(id, g.id); return g.id }
+      const r = g.parent_id ? find(g.parent_id) : null
+      cache.set(id, r); return r
+    }
+    goals.forEach(g => find(g.id))
+    return cache
+  }, [goals])
+
+  // Milestone markers: row range constrained to parent epic's visible rows
+  const ROW_PX = 44 // h-11
+  const milestones = useMemo(() =>
+    flatList
+      .filter(n => n.milestone_date)
+      .map(n => {
+        const offset = diffDays(view.start, n.milestone_date!)
+        if (offset < 0 || offset >= view.days) return null
+        const epicId = epicAncestorOf.get(n.id) ?? null
+        let firstIdx = -1, lastIdx = -1
+        for (let i = 0; i < flatList.length; i++) {
+          const ni = flatList[i]
+          const match = epicId !== null
+            ? epicAncestorOf.get(ni.id) === epicId
+            : ni.id === n.id
+          if (match) { if (firstIdx < 0) firstIdx = i; lastIdx = i }
+        }
+        if (firstIdx < 0) return null
+        return {
+          id: n.id,
+          date: n.milestone_date!,
+          label: n.milestone_label || n.title,
+          storyTitle: n.title,
+          offset,
+          top: firstIdx * ROW_PX,
+          height: (lastIdx - firstIdx + 1) * ROW_PX,
+        }
+      })
+      .filter(Boolean) as Array<{ id: number; date: string; label: string; storyTitle: string; offset: number; top: number; height: number }>
+  , [flatList, view, epicAncestorOf])
+
   const toggleCollapse = useCallback((id: number) => {
     setCollapsed(prev => {
       const next = new Set(prev)
@@ -402,13 +454,16 @@ export default function GoalGantt() {
     setTitle(''); setIssueType('task'); setStatus('todo'); setPriority('medium')
     setCategory(''); setStartDate(formatDate(new Date()))
     setEndDate(addDays(formatDate(new Date()), 30)); setColor('amber'); setMemo('')
+    setMilestoneDate(''); setMilestoneLabel('')
     setEditId(null); setAddParentId(null)
   }
 
   const openEdit = (g: Goal) => {
     setTitle(g.title); setIssueType(g.issue_type); setStatus(g.status); setPriority(g.priority)
     setCategory(g.category); setStartDate(g.start_date); setEndDate(g.end_date)
-    setColor(g.color); setMemo(g.memo || ''); setEditId(g.id); setAddParentId(g.parent_id)
+    setColor(g.color); setMemo(g.memo || '')
+    setMilestoneDate(g.milestone_date || ''); setMilestoneLabel(g.milestone_label || '')
+    setEditId(g.id); setAddParentId(g.parent_id)
     setShowForm(true)
   }
 
@@ -433,6 +488,8 @@ export default function GoalGantt() {
       end_date: endDate,
       color,
       memo: memo || null,
+      milestone_date: milestoneDate || null,
+      milestone_label: milestoneLabel || null,
     }
     if (editId) {
       await apiPatch(`/api/goals/${editId}`, body)
@@ -799,6 +856,28 @@ export default function GoalGantt() {
                 <input type="text" value={memo} onChange={e => setMemo(e.target.value)} placeholder="Optional notes..."
                   className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2.5 text-[#e4e4ec] placeholder-[#5a5a6e] focus:outline-none focus:ring-2 focus:ring-amber-500/40 text-sm" />
               </div>
+
+              {/* Milestone (Story only) */}
+              {issueType === 'story' && (
+                <div className="border border-amber-500/20 rounded-lg p-3 bg-amber-500/5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 bg-amber-400 rotate-45 shrink-0" />
+                    <span className="text-xs font-medium text-amber-400/80">Milestone</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[#8b8b9e] mb-1.5">Date</label>
+                      <input type="date" value={milestoneDate} onChange={e => setMilestoneDate(e.target.value)}
+                        className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2.5 text-[#e4e4ec] focus:outline-none focus:ring-2 focus:ring-amber-500/40 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#8b8b9e] mb-1.5">Label</label>
+                      <input type="text" value={milestoneLabel} onChange={e => setMilestoneLabel(e.target.value)} placeholder="e.g. v1.0 リリース"
+                        className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2.5 text-[#e4e4ec] placeholder-[#5a5a6e] focus:outline-none focus:ring-2 focus:ring-amber-500/40 text-sm" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal footer */}
@@ -1025,6 +1104,38 @@ export default function GoalGantt() {
                     <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
                       style={{ left: `${todayOffset * DAY_WIDTH + DAY_WIDTH / 2}px` }} />
                   )}
+
+                  {/* Milestone lines */}
+                  {milestones.map(m => {
+                    const x = m.offset * DAY_WIDTH + DAY_WIDTH / 2
+                    return (
+                      <div key={`ms-${m.id}`}
+                        className="absolute z-[15]"
+                        style={{ left: `${x}px`, top: `${m.top}px`, height: `${m.height}px` }}>
+                        {/* Hover zone + tooltip */}
+                        <div className="absolute top-0 bottom-0 -left-3 w-7 group/ms cursor-default">
+                          {/* Dashed vertical line */}
+                          <div className="absolute left-1/2 top-0 bottom-0 -translate-x-px pointer-events-none"
+                            style={{ borderLeft: '2px dashed rgba(251,191,36,0.55)', boxShadow: '0 0 6px 0 rgba(251,191,36,0.15)' }} />
+                          {/* Diamond marker at top */}
+                          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-400 rotate-45 shadow-md"
+                            style={{ boxShadow: '0 0 8px 2px rgba(251,191,36,0.45)' }} />
+                          {/* Tooltip */}
+                          <div className="absolute top-6 left-1/2 -translate-x-1/2 hidden group-hover/ms:block z-30 pointer-events-none">
+                            <div className="bg-[#0e0e12] border border-amber-500/40 rounded-lg px-3 py-2 shadow-xl shadow-black/60 whitespace-nowrap text-xs"
+                              style={{ boxShadow: '0 0 0 1px rgba(251,191,36,0.15), 0 8px 24px rgba(0,0,0,0.6)' }}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <div className="w-2 h-2 bg-amber-400 rotate-45 shrink-0" />
+                                <span className="font-bold text-amber-300">{m.label}</span>
+                              </div>
+                              <div className="text-[#5a5a6e] text-[10px]">{m.storyTitle}</div>
+                              <div className="text-[#8b8b9e] text-[10px] mt-0.5 font-mono">{m.date}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
 
                   {flatList.map(node => {
                     const hasChildren = node.children.length > 0

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiPatch } from '../hooks/useApi'
 import type { PartialBlock } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/mantine'
@@ -24,6 +24,8 @@ interface Goal {
   sort_order: number
   scheduled_time: string | null
   scheduled_duration: number | null
+  milestone_date: string | null
+  milestone_label: string | null
 }
 
 interface TicketDetailModalProps {
@@ -61,6 +63,146 @@ const COLOR_MAP: Record<string, { bg: string; bar: string }> = {
   teal:   { bg: 'bg-teal-500/15',   bar: 'bg-teal-500' },
 }
 const COLORS = Object.keys(COLOR_MAP)
+const MONTHS_JP = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+const DAYS_JP   = ['日','月','火','水','木','金','土']
+
+// ── Custom date picker popover ──
+function DatePickerPopover({ value, onChange }: { value: string; onChange: (date: string) => void }) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+  const init = value ? new Date(value + 'T00:00:00') : today
+  const [open, setOpen] = useState(false)
+  const [vy, setVy] = useState(init.getFullYear())
+  const [vm, setVm] = useState(init.getMonth())
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const fn = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [open])
+
+  // Sync view when value changes externally
+  useEffect(() => {
+    if (value) { const d = new Date(value + 'T00:00:00'); setVy(d.getFullYear()); setVm(d.getMonth()) }
+  }, [value])
+
+  const prevM = () => vm === 0 ? (setVy(y => y-1), setVm(11)) : setVm(m => m-1)
+  const nextM = () => vm === 11 ? (setVy(y => y+1), setVm(0)) : setVm(m => m+1)
+
+  const firstDow = new Date(vy, vm, 1).getDay()
+  const daysInMonth = new Date(vy, vm+1, 0).getDate()
+  const cells: (number|null)[] = [...Array(firstDow).fill(null), ...Array.from({length: daysInMonth}, (_,i)=>i+1)]
+
+  const pick = (day: number) => {
+    onChange(`${vy}-${String(vm+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`)
+    setOpen(false)
+  }
+  const goToday = () => {
+    const t = new Date()
+    setVy(t.getFullYear()); setVm(t.getMonth())
+    pick(t.getDate())
+  }
+
+  const display = value ? value.replace(/-/g, '/') : ''
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between bg-[#0e0e12] border rounded-lg px-3 py-2 text-xs transition-colors ${open ? 'border-amber-500/50 ring-1 ring-amber-500/20' : 'border-[#2a2a3a] hover:border-[#3a3a4a]'}`}>
+        <span className={value ? 'text-[#e4e4ec] font-mono tracking-wide' : 'text-[#3a3a4a] italic'}>
+          {display || '日付を選択...'}
+        </span>
+        {value
+          ? <div className="w-2 h-2 bg-amber-400 rotate-45 shrink-0" style={{ boxShadow: '0 0 4px rgba(251,191,36,0.5)' }} />
+          : <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="text-[#3a3a4a] shrink-0">
+              <rect x="2" y="4" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M5 2v3M11 2v3M2 8h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+        }
+      </button>
+
+      {/* Calendar popover */}
+      {open && (
+        <div className="absolute top-full mt-2 left-0 z-50 w-64 select-none"
+          style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.8))' }}>
+          <div className="bg-[#0e0e12] border border-[#2a2a3a] rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 0 0 1px rgba(251,191,36,0.10) inset' }}>
+
+            {/* Month / year header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a28]">
+              <button type="button" onClick={prevM}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5a5a6e] hover:text-amber-400 hover:bg-amber-500/8 transition-colors text-sm">
+                ‹
+              </button>
+              <span className="text-[13px] font-bold text-[#e4e4ec] tracking-tight">
+                {vy}<span className="text-[#5a5a6e] font-normal text-[11px] mx-0.5">年</span>{MONTHS_JP[vm]}
+              </span>
+              <button type="button" onClick={nextM}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[#5a5a6e] hover:text-amber-400 hover:bg-amber-500/8 transition-colors text-sm">
+                ›
+              </button>
+            </div>
+
+            <div className="px-3 pt-2 pb-3">
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAYS_JP.map((d, i) => (
+                  <div key={d} className={`text-center text-[10px] font-semibold py-1 ${i===0?'text-rose-400/70':i===6?'text-sky-400/70':'text-[#3a3a4a]'}`}>{d}</div>
+                ))}
+              </div>
+
+              {/* Day grid */}
+              <div className="grid grid-cols-7 gap-y-0.5">
+                {cells.map((day, i) => {
+                  if (day === null) return <div key={`x${i}`} />
+                  const dow = (firstDow + day - 1) % 7
+                  const ds = `${vy}-${String(vm+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+                  const isSel = value === ds
+                  const isToday = todayStr === ds
+                  return (
+                    <button key={day} type="button" onClick={() => pick(day)}
+                      className={`w-8 h-8 mx-auto flex items-center justify-center text-[11px] rounded-lg font-medium transition-all ${
+                        isSel
+                          ? 'bg-amber-500 text-black shadow-lg'
+                          : isToday
+                          ? 'text-amber-400 ring-1 ring-amber-500/50 hover:bg-amber-500/15'
+                          : dow===0
+                          ? 'text-rose-400/70 hover:bg-[#1a1a28] hover:text-rose-300'
+                          : dow===6
+                          ? 'text-sky-400/70 hover:bg-[#1a1a28] hover:text-sky-300'
+                          : 'text-[#8b8b9e] hover:bg-[#1a1a28] hover:text-[#e4e4ec]'
+                      }`}
+                      style={isSel ? { boxShadow: '0 2px 12px rgba(251,191,36,0.35)' } : {}}>
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-4 py-2 border-t border-[#1a1a28]">
+              {value
+                ? <button type="button" onClick={() => { onChange(''); setOpen(false) }}
+                    className="text-[10px] text-[#5a5a6e] hover:text-rose-400 transition-colors px-2 py-1 rounded-md hover:bg-rose-500/5">
+                    削除
+                  </button>
+                : <span />
+              }
+              <button type="button" onClick={goToday}
+                className="text-[10px] text-amber-400/60 hover:text-amber-400 transition-colors px-2 py-1 rounded-md hover:bg-amber-500/8 font-medium">
+                今日
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function TicketDetailModal({ goal, onClose, onUpdate }: TicketDetailModalProps) {
   // ── Metadata state ──
@@ -74,6 +216,8 @@ export default function TicketDetailModal({ goal, onClose, onUpdate }: TicketDet
   const [color, setColor] = useState(goal.color)
   const [scheduledTime, setScheduledTime] = useState(goal.scheduled_time ?? '')
   const [scheduledDuration, setScheduledDuration] = useState(goal.scheduled_duration ?? 60)
+  const [milestoneDate, setMilestoneDate] = useState(goal.milestone_date ?? '')
+  const [milestoneLabel, setMilestoneLabel] = useState(goal.milestone_label ?? '')
 
   // ── Note editor state ──
   const [saved, setSaved] = useState(false)
@@ -311,6 +455,39 @@ export default function TicketDetailModal({ goal, onClose, onUpdate }: TicketDet
                   クリア
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Milestone section (story only) ── */}
+        {issueType === 'story' && (
+          <div className="px-6 py-4 border-b border-[#2a2a3a]">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2.5 h-2.5 bg-amber-400 rotate-45 shrink-0"
+                style={{ boxShadow: milestoneDate ? '0 0 6px 2px rgba(251,191,36,0.4)' : 'none' }} />
+              <label className="text-[10px] font-medium text-amber-400/70 uppercase tracking-wider">Milestone</label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-medium text-[#5a5a6e] mb-1 uppercase tracking-wider">Date</label>
+                <DatePickerPopover
+                  value={milestoneDate}
+                  onChange={date => {
+                    setMilestoneDate(date)
+                    patchField({ milestone_date: date || null } as Partial<Goal>)
+                  }} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-[#5a5a6e] mb-1 uppercase tracking-wider">Label</label>
+                <input
+                  type="text"
+                  value={milestoneLabel}
+                  onChange={e => setMilestoneLabel(e.target.value)}
+                  onBlur={() => patchField({ milestone_label: milestoneLabel || null } as Partial<Goal>)}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  placeholder="e.g. v1.0 リリース"
+                  className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-[#e4e4ec] placeholder-[#3a3a4a] focus:outline-none focus:border-amber-500/40 text-xs" />
+              </div>
             </div>
           </div>
         )}

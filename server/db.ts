@@ -132,5 +132,7 @@ try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_time TEXT`) } catch { /* a
 try { db.exec(`ALTER TABLE goals ADD COLUMN scheduled_duration INTEGER`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE routines ADD COLUMN memo TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE wish_items ADD COLUMN done_at TEXT`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_date TEXT`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_label TEXT`) } catch { /* already exists */ }
 
 export default db;

@@ -32,14 +32,14 @@ router.get('/', (req, res) => {
 
 // Create goal
 router.post('/', (req, res) => {
-  const { parent_id, title, issue_type, status, priority, category, start_date, end_date, color, memo, note, scheduled_time, scheduled_duration } = req.body;
+  const { parent_id, title, issue_type, status, priority, category, start_date, end_date, color, memo, note, scheduled_time, scheduled_duration, milestone_date, milestone_label } = req.body;
   const maxOrder = db.prepare(
     'SELECT COALESCE(MAX(sort_order), 0) as m FROM goals WHERE COALESCE(parent_id, 0) = ?'
   ).get(parent_id || 0) as { m: number };
 
   const result = db.prepare(
-    `INSERT INTO goals (parent_id, title, issue_type, status, priority, category, start_date, end_date, color, memo, note, sort_order, scheduled_time, scheduled_duration)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO goals (parent_id, title, issue_type, status, priority, category, start_date, end_date, color, memo, note, sort_order, scheduled_time, scheduled_duration, milestone_date, milestone_label)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     parent_id || null,
     title,
@@ -55,6 +55,8 @@ router.post('/', (req, res) => {
     maxOrder.m + 1,
     scheduled_time || null,
     scheduled_duration || null,
+    milestone_date || null,
+    milestone_label || null,
   );
   syncParentDates(parent_id || null);
   const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(result.lastInsertRowid);
@@ -66,12 +68,12 @@ router.patch('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id) as Record<string, unknown>;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
-  const { parent_id, title, issue_type, status, priority, category, start_date, end_date, progress, color, memo, note, sort_order, scheduled_time, scheduled_duration } = req.body;
+  const { parent_id, title, issue_type, status, priority, category, start_date, end_date, progress, color, memo, note, sort_order, scheduled_time, scheduled_duration, milestone_date, milestone_label } = req.body;
 
   db.prepare(
     `UPDATE goals SET parent_id = ?, title = ?, issue_type = ?, status = ?, priority = ?, category = ?,
      start_date = ?, end_date = ?, progress = ?, color = ?, memo = ?, note = ?, sort_order = ?,
-     scheduled_time = ?, scheduled_duration = ? WHERE id = ?`
+     scheduled_time = ?, scheduled_duration = ?, milestone_date = ?, milestone_label = ? WHERE id = ?`
   ).run(
     parent_id !== undefined ? (parent_id || null) : existing.parent_id,
     title ?? existing.title,
@@ -88,6 +90,8 @@ router.patch('/:id', (req, res) => {
     sort_order ?? existing.sort_order,
     scheduled_time !== undefined ? (scheduled_time || null) : existing.scheduled_time,
     scheduled_duration !== undefined ? (scheduled_duration || null) : existing.scheduled_duration,
+    milestone_date !== undefined ? (milestone_date || null) : existing.milestone_date,
+    milestone_label !== undefined ? (milestone_label || null) : existing.milestone_label,
     req.params.id
   );
   // Sync parent dates after updating this goal
