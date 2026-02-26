@@ -341,10 +341,7 @@ export default function WishListPage() {
   return (
     <div className="flex gap-6 max-w-5xl mx-auto">
       {/* ── Left: Main content ── */}
-      <div
-        className="flex-1 min-w-0 transition-all duration-400"
-        style={{ maxWidth: isEditMode ? 'calc(100% - 340px)' : '100%' }}
-      >
+      <div className="flex-1 min-w-0">
         {/* Header with gradient accent */}
         <div className={`mb-6 pb-4 border-b border-[#2a2a3a] bg-gradient-to-r ${theme.headerGradient} -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1 transition-all duration-500`}>
           <h1 className="text-2xl font-bold text-white tracking-wide mb-1">Wish List</h1>
@@ -397,9 +394,9 @@ export default function WishListPage() {
           </div>
         )}
 
-        {/* Add/Edit Form */}
+        {/* Add/Edit Form — desktop inline */}
         {(showForm || editingId !== null) && (
-          <div className={`mb-4 ${theme.cardBg} border ${theme.cardBorder} ${theme.leftAccent} ${theme.cardRadius} p-4`}>
+          <div className={`hidden md:block mb-4 ${theme.cardBg} border ${theme.cardBorder} ${theme.leftAccent} ${theme.cardRadius} p-4`}>
             <div className="grid gap-3">
               <input
                 ref={titleRef}
@@ -457,6 +454,114 @@ export default function WishListPage() {
               >
                 {submitting ? '保存中...' : editingId !== null ? '更新' : '追加'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Add/Edit Form — mobile popup with diary */}
+        {(showForm || editingId !== null) && (
+          <div className="md:hidden fixed inset-0 z-50 flex flex-col">
+            {/* Backdrop */}
+            <div className="flex-1 bg-black/60" onClick={resetForm} />
+            {/* Sheet */}
+            <div className="bg-[#16161e] rounded-t-2xl shadow-2xl border-t border-[#2a2a3a] flex flex-col" style={{ maxHeight: '88vh' }}>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[#2a2a3a] shrink-0">
+                <span className="text-sm font-bold text-[#e4e4ec]">
+                  {editingId !== null ? '編集' : '追加'}
+                </span>
+                <button onClick={resetForm} className="ml-auto text-xl leading-none text-[#5a5a6e] hover:text-[#e4e4ec] transition-colors">&times;</button>
+              </div>
+              {/* Form inputs */}
+              <div className="px-4 py-3 space-y-3 border-b border-[#2a2a3a] shrink-0">
+                {error && (
+                  <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">{error}</div>
+                )}
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder={activeTab === 'wish' ? '欲しいものの名前' : 'やりたいことの名前'}
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') editingId !== null ? handleUpdate() : handleCreate() }}
+                  className={`w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#3a3a4a] ${theme.focusBorder} focus:outline-none transition-colors`}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  {activeTab === 'wish' && (
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5a5a6e] text-sm">¥</span>
+                      <input
+                        type="number"
+                        placeholder="価格"
+                        value={form.price}
+                        onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+                        className={`w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-[#3a3a4a] ${theme.focusBorder} focus:outline-none transition-colors`}
+                      />
+                    </div>
+                  )}
+                  <DatePicker
+                    value={form.deadline}
+                    onChange={v => setForm(f => ({ ...f, deadline: v }))}
+                    placeholder="期限を選択"
+                    accentColor={activeTab === 'wish' ? 'amber' : 'teal'}
+                    className={activeTab === 'bucket' ? 'col-span-2' : ''}
+                  />
+                </div>
+                <input
+                  type="text"
+                  placeholder={activeTab === 'wish' ? 'URL（商品ページなど）' : 'URL（参考ページなど）'}
+                  value={form.url}
+                  onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+                  className={`w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#3a3a4a] ${theme.focusBorder} focus:outline-none transition-colors`}
+                />
+                <textarea
+                  placeholder="メモ"
+                  value={form.memo}
+                  onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
+                  rows={2}
+                  className={`w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#3a3a4a] ${theme.focusBorder} focus:outline-none transition-colors resize-none`}
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={resetForm} className="px-3 py-1.5 text-xs text-[#5a5a6e] hover:text-[#8b8b9e] transition-colors">
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={editingId !== null ? handleUpdate : handleCreate}
+                    disabled={!form.title.trim() || submitting}
+                    className={`px-4 py-1.5 ${theme.submitBtn} disabled:opacity-40 ${activeTab === 'wish' ? 'text-black' : 'text-white'} text-xs font-medium rounded-lg transition-colors`}
+                  >
+                    {submitting ? '保存中...' : editingId !== null ? '更新' : '追加'}
+                  </button>
+                </div>
+              </div>
+              {/* Diary section */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="px-4 pt-3 pb-2 border-b border-[#2a2a3a] flex items-center gap-2 shrink-0">
+                  <svg className="w-4 h-4 text-[#5a5a6e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                  </svg>
+                  <span className="text-xs text-[#8b8b9e]">日記の未チェック</span>
+                </div>
+                <div className="p-3 space-y-4">
+                  {(!diaryEntries || diaryEntries.length === 0) && (
+                    <p className="text-xs text-[#2a2a3a] italic">日記がありません</p>
+                  )}
+                  {(diaryEntries ?? []).map(entry => (
+                    <div key={entry.date}>
+                      <div className="text-[10px] text-[#3a3a4e] font-mono px-1 mb-1">
+                        {formatDateLabel(entry.date)}
+                      </div>
+                      <DiaryChecklist
+                        date={entry.date}
+                        content={entry.content}
+                        onUpdated={refetchDiary}
+                        flushTrigger={diaryFlush}
+                        hideFaded
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -719,9 +824,10 @@ export default function WishListPage() {
         )}
       </div>
 
-      {/* ── Right: Diary panel (appears during create/edit) ── */}
+      {/* ── Right: Diary panel (desktop: side panel / mobile: bottom sheet) ── */}
+      {/* Desktop side panel */}
       <div
-        className="shrink-0"
+        className="shrink-0 hidden md:block"
         style={{
           width: isEditMode ? '320px' : '0px',
           opacity: isEditMode ? 1 : 0,
@@ -765,6 +871,7 @@ export default function WishListPage() {
           </div>
         </div>
       </div>
+
 
       {/* ── Ticket creation modal ── */}
       {ticketItem && (

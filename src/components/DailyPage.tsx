@@ -75,6 +75,38 @@ const COLORS = [
 // ══════════════════════════════════════
 // DailyPage
 // ══════════════════════════════════════
+// ── Mobile accordion section ──
+function MobileSection({ title, defaultOpen = false, action, children }: {
+  title: string
+  defaultOpen?: boolean
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="bg-[#16161e] rounded-xl border border-[#2a2a3a] overflow-hidden">
+      <div className="flex items-center">
+        <button
+          className="flex-1 flex items-center gap-2 px-4 py-3 text-left active:bg-[#1e1e2a] transition-colors"
+          onClick={() => setOpen(v => !v)}
+        >
+          <span className="text-xs font-bold tracking-wider text-[#8b8b9e] uppercase">{title}</span>
+          <svg className={`w-3.5 h-3.5 text-[#3a3a4e] ml-auto shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        {action && <div className="pr-3">{action}</div>}
+      </div>
+      {open && (
+        <div className="border-t border-[#2a2a3a] p-3 [&_h2.techo-heading]:hidden">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DailyPage() {
   const [date, setDate] = useState(formatDate(new Date()))
   const isToday = date === formatDate(new Date())
@@ -87,33 +119,54 @@ export default function DailyPage() {
 
   return (
     <div>
-      {/* Shared date header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => changeDate(-1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&larr;</button>
-        <h2 className="techo-heading text-2xl min-w-[200px] text-center">{formatDateLabel(date)}</h2>
-        <button onClick={() => changeDate(1)} className="px-3 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors">&rarr;</button>
+      {/* Date header */}
+      <div className="flex items-center gap-2 mb-3 md:mb-4">
+        <button onClick={() => changeDate(-1)} className="px-2.5 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors text-sm">&larr;</button>
+        <h2 className="techo-heading text-sm md:text-2xl flex-1 text-center">{formatDateLabel(date)}</h2>
+        <button onClick={() => changeDate(1)} className="px-2.5 py-1.5 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors text-sm">&rarr;</button>
         <button
           onClick={() => setDate(formatDate(new Date()))}
-          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${isToday ? 'bg-amber-500 text-black font-semibold' : 'bg-[#1e1e2a] text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'}`}
+          className={`px-2.5 py-1.5 rounded-lg text-xs transition-colors ${isToday ? 'bg-amber-500 text-black font-semibold' : 'text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'}`}
         >
           今日
         </button>
+      </div>
+
+      {/* Monthly goal — desktop only in header row */}
+      <div className="hidden md:block mb-2">
         <MonthlyGoalBadge date={date} />
       </div>
 
-      <WeeklyGoalSection date={date} />
-
-      {/* Two-column layout – stacks on narrow, side-by-side on wide */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left: Timeline */}
-        <div className="w-full lg:w-80 shrink-0">
-          <ScheduleTimeline date={date} isToday={isToday} />
-        </div>
-
-        {/* Right: Diary + Habits + Goals */}
-        <div className="flex-1 min-w-0 w-full space-y-6">
+      {/* ── Mobile layout: accordion ── */}
+      <div className="md:hidden space-y-2">
+        <MobileSection title="今週の目標 / 今月の目標">
+          <WeeklyGoalSection date={date} />
+          <div className="mt-2 pt-2 border-t border-[#2a2a3a]">
+            <MonthlyGoalBadge date={date} />
+          </div>
+        </MobileSection>
+        <MobileSection title="日記" defaultOpen>
           <Diary date={date} />
+        </MobileSection>
+        <MobileSection title="スケジュール">
+          <ScheduleTimeline date={date} isToday={isToday} />
+        </MobileSection>
+        <MobileSection title="習慣">
           <HabitSection date={date} />
+        </MobileSection>
+      </div>
+
+      {/* ── Desktop layout ── */}
+      <div className="hidden md:block">
+        <WeeklyGoalSection date={date} />
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="w-full lg:w-80 shrink-0">
+            <ScheduleTimeline date={date} isToday={isToday} />
+          </div>
+          <div className="flex-1 min-w-0 w-full space-y-6">
+            <Diary date={date} />
+            <HabitSection date={date} />
+          </div>
         </div>
       </div>
     </div>

@@ -341,3 +341,78 @@ body {
 [data-mantine-color-scheme] {
   --mantine-color-body: var(--bg-base);
 }
+
+/* ══════════════════════════════════════
+   Mobile Layout
+   ══════════════════════════════════════ */
+
+/* Top header (mobile only) */
+.mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Bottom nav (mobile only) */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 64px;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+  transition: color var(--transition), background var(--transition);
+  padding: 6px 0;
+}
+
+.mobile-nav-item:active {
+  background: var(--bg-hover);
+}
+
+.mobile-nav-item.active {
+  color: var(--accent);
+}
+
+.mobile-nav-item.active span:first-child {
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.5));
+}
+
+/* Ensure mobile-only elements are hidden on desktop
+   (CSS specificity fix: custom display:flex overrides Tailwind md:hidden) */
+@media (min-width: 768px) {
+  .mobile-header {
+    display: none;
+  }
+  .mobile-bottom-nav {
+    display: none;
+  }
+}

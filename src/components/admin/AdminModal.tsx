@@ -98,17 +98,15 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
   const { data: diaryEntries, refetch: refetchDiary } = useApi<DiaryEntry[]>('/api/diary/')
   const [diaryFlush, setDiaryFlush] = useState(0)
 
-  // Completed panel state
+  // Completed section state
   const [selectedCompletedId, setSelectedCompletedId] = useState<number | null>(null)
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const isEditMode = activeTab === 'feature-requests' && (showForm || editingId !== null)
 
   // Split items into active and completed
   const activeItems = (items ?? []).filter(i => i.status !== 'done' && i.status !== 'rejected')
   const completedItems = (items ?? []).filter(i => i.status === 'done' || i.status === 'rejected')
-  const showCompletedPanel = activeTab === 'feature-requests' && completedItems.length > 0
-
-  const selectedCompleted = completedItems.find(i => i.id === selectedCompletedId) ?? null
 
   // Close handler: trigger diary flush for all instances, then close
   const handleClose = useCallback(() => {
@@ -222,114 +220,19 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
       onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
       <div
-        className="flex gap-4 mx-4 max-h-[80vh]"
+        className="flex gap-2 mx-4 max-h-[90vh] max-w-[calc(100vw-2rem)]"
         style={{
           opacity: animateIn ? 1 : 0,
           transform: animateIn ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
           transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
-        {/* ── Left: Completed items panel ── */}
-        <div
-          style={{
-            width: showCompletedPanel ? '220px' : '0px',
-            opacity: showCompletedPanel ? 1 : 0,
-            transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <div
-            className="bg-[#12121a] rounded-2xl shadow-2xl border border-[#2a2a3a] h-full flex flex-col"
-            style={{ width: '220px' }}
-          >
-            <div className="px-4 pt-4 pb-3 border-b border-[#2a2a3a] shrink-0">
-              <div className="flex items-center gap-2">
-                <svg className="w-3.5 h-3.5 text-emerald-500/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                <span className="text-xs font-medium text-[#5a5a6e]">完了済み</span>
-                <span className="text-[10px] text-[#3a3a4e] ml-auto">{completedItems.length}</span>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {completedItems.map(item => {
-                const isSelected = selectedCompletedId === item.id
-                const isRejected = item.status === 'rejected'
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelectedCompletedId(isSelected ? null : item.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-all text-xs ${
-                      isSelected
-                        ? 'bg-[#1e1e2a] border border-[#3a3a4a]'
-                        : 'hover:bg-[#1a1a24] border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isRejected ? 'bg-red-500/40' : 'bg-emerald-500/40'}`} />
-                      <span className="text-[#8b8b9e] truncate leading-tight">{item.title}</span>
-                    </div>
-                    <span className="text-[10px] text-[#3a3a4e] ml-3.5 block mt-0.5">{formatCreatedDate(item.created_at)}</span>
-                  </button>
-                )
-              })}
-            </div>
-            {/* Selected completed detail */}
-            {selectedCompleted && (
-              <div className="border-t border-[#2a2a3a] p-3 max-h-[40%] overflow-y-auto shrink-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <select
-                    value={selectedCompleted.status}
-                    onChange={e => {
-                      const newStatus = e.target.value as FeatureRequest['status']
-                      handleUpdate(selectedCompleted.id, { status: newStatus })
-                      if (newStatus !== 'done' && newStatus !== 'rejected') {
-                        setSelectedCompletedId(null)
-                      }
-                    }}
-                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer appearance-none text-center border-0 focus:outline-none focus:ring-1 focus:ring-amber-500/30 ${
-                      (STATUS_OPTIONS.find(s => s.value === selectedCompleted.status) ?? STATUS_OPTIONS[0]).color
-                    }`}
-                  >
-                    {STATUS_OPTIONS.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => handleDelete(selectedCompleted.id)}
-                    className="text-[10px] text-[#3a3a4e] hover:text-red-400 transition-colors"
-                  >
-                    削除
-                  </button>
-                </div>
-                <p className="text-xs text-[#e4e4ec] font-medium mb-1">{selectedCompleted.title}</p>
-                {selectedCompleted.description && (
-                  <pre className="text-[10px] text-[#5a5a6e] whitespace-pre-wrap font-sans leading-relaxed mb-2">
-                    {selectedCompleted.description}
-                  </pre>
-                )}
-                <div className="mt-1 pt-2 border-t border-[#2a2a3a]">
-                  <p className="text-[9px] text-[#3a3a4e] uppercase tracking-widest mb-1">Commit</p>
-                  {selectedCompleted.commit_message ? (
-                    <pre className="text-[10px] text-emerald-500/60 whitespace-pre-wrap font-mono leading-relaxed break-all">
-                      {selectedCompleted.commit_message}
-                    </pre>
-                  ) : (
-                    <p className="text-[10px] text-[#2a2a3a] italic">未記録</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ── Center: Active Feature Requests ── */}
         <div
-          className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden flex flex-col"
+          className="bg-[#16161e] rounded-2xl shadow-2xl border border-[#2a2a3a] overflow-hidden flex flex-col flex-1 min-w-0"
           style={{
-            width: isEditMode ? '540px' : '640px',
-            transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)',
+            maxWidth: isEditMode ? '540px' : '640px',
+            transition: 'max-width 0.4s cubic-bezier(0.4,0,0.2,1)',
           }}
         >
           {/* Header with tabs */}
@@ -437,6 +340,76 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
                   onDrop={handleDrop}
                 />
               ))}
+
+              {/* ── Completed items (collapsible) ── */}
+              {completedItems.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-[#1e1e2a]">
+                  <button
+                    onClick={() => setShowCompleted(v => !v)}
+                    className="flex items-center gap-2 w-full text-left text-xs text-[#5a5a6e] hover:text-[#8b8b9e] transition-colors mb-2"
+                  >
+                    <svg className={`w-3 h-3 transition-transform duration-200 ${showCompleted ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                    完了済み ({completedItems.length})
+                  </button>
+                  {showCompleted && (
+                    <div className="space-y-1">
+                      {completedItems.map(item => {
+                        const isSelected = selectedCompletedId === item.id
+                        const isRejected = item.status === 'rejected'
+                        return (
+                          <div key={item.id} className="rounded-lg border border-[#1e1e2a] bg-[#0a0a10] overflow-hidden">
+                            <button
+                              onClick={() => setSelectedCompletedId(isSelected ? null : item.id)}
+                              className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-[#12121a] transition-colors"
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isRejected ? 'bg-red-500/40' : 'bg-emerald-500/40'}`} />
+                              <span className="text-xs text-[#8b8b9e] truncate flex-1">{item.title}</span>
+                              <span className="text-[10px] text-[#3a3a4e] shrink-0">{formatCreatedDate(item.created_at)}</span>
+                              <svg className={`w-3 h-3 text-[#3a3a4e] transition-transform duration-200 ${isSelected ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                              </svg>
+                            </button>
+                            {isSelected && (
+                              <div className="px-3 pb-3 pt-2 border-t border-[#1e1e2a]">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <select
+                                    value={item.status}
+                                    onChange={e => {
+                                      const newStatus = e.target.value as FeatureRequest['status']
+                                      handleUpdate(item.id, { status: newStatus })
+                                      if (newStatus !== 'done' && newStatus !== 'rejected') setSelectedCompletedId(null)
+                                    }}
+                                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer appearance-none text-center border-0 focus:outline-none focus:ring-1 focus:ring-amber-500/30 ${
+                                      (STATUS_OPTIONS.find(s => s.value === item.status) ?? STATUS_OPTIONS[0]).color
+                                    }`}
+                                  >
+                                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                  </select>
+                                  <button
+                                    onClick={() => handleDelete(item.id)}
+                                    className="text-[10px] text-[#3a3a4e] hover:text-red-400 transition-colors"
+                                  >削除</button>
+                                </div>
+                                {item.description && (
+                                  <pre className="text-[10px] text-[#5a5a6e] whitespace-pre-wrap font-sans leading-relaxed mb-2">{item.description}</pre>
+                                )}
+                                {item.commit_message && (
+                                  <div className="mt-1 pt-2 border-t border-[#1e1e2a]">
+                                    <p className="text-[9px] text-[#3a3a4e] uppercase tracking-widest mb-1">Commit</p>
+                                    <pre className="text-[10px] text-emerald-500/60 whitespace-pre-wrap font-mono leading-relaxed break-all">{item.commit_message}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </>)}
 
             {activeTab === 'routines' && (
@@ -447,6 +420,7 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
         {/* ── Right: Diary panel (appears during create/edit) ── */}
         <div
+          className="hidden md:block"
           style={{
             width: isEditMode ? '320px' : '0px',
             opacity: isEditMode ? 1 : 0,
