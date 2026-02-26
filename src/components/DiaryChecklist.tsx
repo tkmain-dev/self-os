@@ -7,6 +7,7 @@ interface DiaryChecklistProps {
   onUpdated: () => void
   flushTrigger?: number  // increment to trigger flush (save checked items as faded)
   flushRef?: React.RefObject<(() => Promise<void>) | null>  // expose flush for imperative call
+  hideFaded?: boolean  // when true, skip rendering already-faded (strikethrough) lines
 }
 
 interface FlatLine {
@@ -78,7 +79,7 @@ function fadeBlockAtPath(blocks: any[], path: number[]): any[] {
   return result
 }
 
-export default function DiaryChecklist({ date, content, onUpdated, flushTrigger = 0, flushRef }: DiaryChecklistProps) {
+export default function DiaryChecklist({ date, content, onUpdated, flushTrigger = 0, flushRef, hideFaded = false }: DiaryChecklistProps) {
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set())
   const checkedRef = useRef(checkedPaths)
   const contentRef = useRef(content)
@@ -166,9 +167,15 @@ export default function DiaryChecklist({ date, content, onUpdated, flushTrigger 
     return <p className="text-xs text-[#2a2a3a] italic">この日の日記はありません</p>
   }
 
+  const visibleLines = hideFaded ? lines.filter(l => !l.isFaded) : lines
+
+  if (visibleLines.length === 0) {
+    return <p className="text-xs text-[#2a2a3a] italic">この日の日記はありません</p>
+  }
+
   return (
     <div className="space-y-0.5">
-      {lines.map(line => {
+      {visibleLines.map(line => {
         const pathKey = line.path.join('-')
         const isChecked = checkedPaths.has(pathKey)
 

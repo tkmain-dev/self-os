@@ -20,7 +20,7 @@ router.put('/:date', (req, res) => {
 });
 
 router.get('/', (_req, res) => {
-  const entries = db.prepare('SELECT date, substr(content, 1, 50) as preview FROM diary ORDER BY date DESC LIMIT 30').all();
+  const entries = db.prepare('SELECT date, content FROM diary ORDER BY date DESC LIMIT 30').all();
   res.json(entries);
 });
 

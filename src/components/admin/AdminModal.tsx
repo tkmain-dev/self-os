@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useApi, apiPost, apiPatch, apiDelete } from '../../hooks/useApi'
 import DiaryChecklist from '../DiaryChecklist'
 
@@ -37,21 +37,10 @@ const STATUS_OPTIONS: { value: FeatureRequest['status']; label: string; color: s
   { value: 'rejected', label: '却下', color: 'bg-red-500/20 text-red-400' },
 ]
 
-function todayStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 function formatDateLabel(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00')
   const days = ['日', '月', '火', '水', '木', '金', '土']
   return `${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`
-}
-
-function shiftDate(dateStr: string, delta: number) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + delta)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function formatCreatedDate(dateStr: string) {
@@ -105,15 +94,12 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
   const [dropTargetId, setDropTargetId] = useState<number | null>(null)
   const [dropPosition, setDropPosition] = useState<'above' | 'below'>('below')
 
-  // Diary state
-  const [diaryDate, setDiaryDate] = useState(todayStr)
-  const { data: diaryEntry, refetch: refetchDiary } = useApi<DiaryEntry>(`/api/diary/${diaryDate}`)
+  // Diary state — aggregate: all recent entries with unchecked lines
+  const { data: diaryEntries, refetch: refetchDiary } = useApi<DiaryEntry[]>('/api/diary/')
+  const [diaryFlush, setDiaryFlush] = useState(0)
 
   // Completed panel state
   const [selectedCompletedId, setSelectedCompletedId] = useState<number | null>(null)
-
-  // Diary flush ref (call before close to save checked items as faded)
-  const diaryFlushRef = useRef<(() => Promise<void>) | null>(null) as React.RefObject<(() => Promise<void>) | null>
 
   const isEditMode = activeTab === 'feature-requests' && (showForm || editingId !== null)
 
@@ -124,9 +110,9 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
 
   const selectedCompleted = completedItems.find(i => i.id === selectedCompletedId) ?? null
 
-  // Close handler: flush diary BEFORE unmounting, then close
-  const handleClose = useCallback(async () => {
-    await diaryFlushRef.current?.()
+  // Close handler: trigger diary flush for all instances, then close
+  const handleClose = useCallback(() => {
+    setDiaryFlush(n => n + 1)
     onClose()
   }, [onClose])
 
@@ -139,7 +125,6 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
       setShowForm(false)
       setEditingId(null)
       setExpandedId(null)
-      setDiaryDate(todayStr())
       setSelectedCompletedId(null)
     }
   }, [open])
@@ -480,38 +465,32 @@ export default function AdminModal({ open, onClose }: { open: boolean; onClose: 
             }}
           >
             {/* Diary header */}
-            <div className="px-4 pt-4 pb-3 border-b border-[#2a2a3a] flex items-center gap-1 shrink-0">
-              <svg className="w-4 h-4 text-[#5a5a6e] mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="px-4 pt-4 pb-3 border-b border-[#2a2a3a] flex items-center gap-2 shrink-0">
+              <svg className="w-4 h-4 text-[#5a5a6e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
               </svg>
-              <button
-                onClick={() => setDiaryDate(d => shiftDate(d, -1))}
-                className="px-1.5 py-0.5 text-[#5a5a6e] hover:text-[#e4e4ec] transition-colors text-xs"
-              >
-                &lsaquo;
-              </button>
-              <button
-                onClick={() => setDiaryDate(todayStr())}
-                className="flex-1 text-center text-xs text-[#8b8b9e] hover:text-[#e4e4ec] transition-colors"
-              >
-                {formatDateLabel(diaryDate)}
-              </button>
-              <button
-                onClick={() => setDiaryDate(d => shiftDate(d, 1))}
-                className="px-1.5 py-0.5 text-[#5a5a6e] hover:text-[#e4e4ec] transition-colors text-xs"
-              >
-                &rsaquo;
-              </button>
+              <span className="text-xs text-[#8b8b9e]">日記の未チェック</span>
             </div>
 
             {/* Diary body */}
-            <div className="flex-1 p-3 overflow-y-auto">
-              <DiaryChecklist
-                date={diaryDate}
-                content={diaryEntry?.content ?? ''}
-                onUpdated={refetchDiary}
-                flushRef={diaryFlushRef}
-              />
+            <div className="flex-1 p-3 overflow-y-auto space-y-4">
+              {(!diaryEntries || diaryEntries.length === 0) && (
+                <p className="text-xs text-[#2a2a3a] italic">日記がありません</p>
+              )}
+              {(diaryEntries ?? []).map(entry => (
+                <div key={entry.date}>
+                  <div className="text-[10px] text-[#3a3a4e] font-mono px-1 mb-1">
+                    {formatDateLabel(entry.date)}
+                  </div>
+                  <DiaryChecklist
+                    date={entry.date}
+                    content={entry.content}
+                    onUpdated={refetchDiary}
+                    flushTrigger={diaryFlush}
+                    hideFaded
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
