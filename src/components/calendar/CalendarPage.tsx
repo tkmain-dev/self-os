@@ -7,6 +7,7 @@ import CalendarMonthView from './CalendarMonthView'
 import CalendarWeekView from './CalendarWeekView'
 import CalendarDayView from './CalendarDayView'
 import CalendarFormModal from './CalendarFormModal'
+import CalendarDayPopup from './CalendarDayPopup'
 
 export default function CalendarPage() {
   const [view, setView] = useState<CalendarView>('month')
@@ -40,6 +41,9 @@ export default function CalendarPage() {
   )
   const events = useMemo(() => mergeEvents(nonHabitSchedules, goals), [nonHabitSchedules, goals])
 
+  // Popup state (day click)
+  const [popupDate, setPopupDate] = useState<string | null>(null)
+
   // Modal state
   const [showModal, setShowModal] = useState(false)
   const [modalMode, setModalMode] = useState<'schedule' | 'goal'>('schedule')
@@ -71,8 +75,14 @@ export default function CalendarPage() {
     setAnchorDate(formatDate(d))
   }, [anchorDate, view])
 
-  // Date click → open schedule creation modal
+  // Date click → open day popup
   const handleDateClick = useCallback((dateStr: string) => {
+    setPopupDate(dateStr)
+  }, [])
+
+  // New schedule from popup
+  const handleNewScheduleFromPopup = useCallback((dateStr: string) => {
+    setPopupDate(null)
     setPrefilledDate(dateStr)
     setPrefilledStartTime(null)
     setPrefilledEndTime(null)
@@ -105,6 +115,15 @@ export default function CalendarPage() {
   const handleNavigateToDay = useCallback((dateStr: string) => {
     setAnchorDate(dateStr)
     setView('day')
+  }, [])
+
+  // Event click from popup → close popup, open edit modal
+  const handlePopupEventClick = useCallback((event: CalendarEvent) => {
+    setPopupDate(null)
+    setEditItem(event.original)
+    setModalMode(event.type)
+    setPrefilledDate(null)
+    setShowModal(true)
   }, [])
 
   // Modal saved → close and refetch
@@ -155,6 +174,15 @@ export default function CalendarPage() {
           routines={routines ?? []}
           onSlotClick={handleSlotClick}
           onEventClick={handleEventClick}
+        />
+      )}
+
+      {popupDate && (
+        <CalendarDayPopup
+          date={popupDate}
+          onClose={() => setPopupDate(null)}
+          onEventClick={handlePopupEventClick}
+          onNewSchedule={handleNewScheduleFromPopup}
         />
       )}
 
