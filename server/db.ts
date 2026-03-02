@@ -139,7 +139,87 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     expires_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS budget_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL CHECK(type IN ('fixed', 'variable')),
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS budget_subcategories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (category_id) REFERENCES budget_categories(id) ON DELETE CASCADE,
+    UNIQUE(category_id, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS budget_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    subcategory_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL DEFAULT 0,
+    is_recurring INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (subcategory_id) REFERENCES budget_subcategories(id) ON DELETE CASCADE,
+    UNIQUE(year_month, subcategory_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS budget_income (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL UNIQUE,
+    amount INTEGER NOT NULL DEFAULT 0,
+    is_recurring INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS budget_actuals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    category_name TEXT NOT NULL,
+    subcategory_name TEXT NOT NULL DEFAULT '',
+    date TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    amount INTEGER NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    csv_id TEXT UNIQUE
+  );
 `);
+
+// Seed budget categories if empty
+const catCount = db.prepare('SELECT COUNT(*) as c FROM budget_categories').get() as { c: number };
+if (catCount.c === 0) {
+  const insertCat = db.prepare('INSERT INTO budget_categories (name, type, sort_order) VALUES (?, ?, ?)');
+  const insertSub = db.prepare('INSERT INTO budget_subcategories (category_id, name, sort_order) VALUES (?, ?, ?)');
+
+  const seed: [string, 'fixed' | 'variable', string[]][] = [
+    ['住宅', 'fixed', ['家賃', '管理費', '更新積立（年払いの月割）']],
+    ['水道・光熱費', 'fixed', ['電気', 'ガス', '水道']],
+    ['通信費', 'fixed', ['スマホ', '自宅ネット', 'サブスク（Netflix等）']],
+    ['保険', 'fixed', ['医療保険', '生命保険', 'バイク保険']],
+    ['税・社会保障', 'fixed', ['住民税', '年金（追加納付）', 'その他税']],
+    ['自動車', 'fixed', ['ローン', '駐車場', '任意保険', '車検積立', 'ガソリン']],
+    ['食費', 'variable', ['平日自炊', '平日外食', '休日外食', 'カフェ']],
+    ['日用品', 'variable', ['消耗品', '家庭用品']],
+    ['趣味・娯楽', 'variable', ['バイク関連', '旅行・登山', 'ゲーム', 'サウナ・ジム', 'サブイベント']],
+    ['衣服・美容', 'variable', ['衣服', '美容院', 'スキンケア']],
+    ['交通費', 'variable', ['通勤', 'プライベート移動']],
+    ['交際費', 'variable', ['飲み会', 'デート', 'プレゼント']],
+    ['教養・教育', 'variable', ['書籍', '資格', 'AIツール', 'オンライン講座']],
+    ['健康・医療', 'variable', ['通院', '薬', 'サプリ']],
+    ['特別な支出', 'variable', ['家電', '家具', '旅行大型出費', 'ギア買い替え']],
+    ['その他', 'variable', ['未分類一時支出']],
+  ];
+
+  const seedTx = db.transaction(() => {
+    seed.forEach(([name, type, subs], i) => {
+      const result = insertCat.run(name, type, i);
+      const catId = result.lastInsertRowid;
+      subs.forEach((sub, j) => insertSub.run(catId, sub, j));
+    });
+  });
+  seedTx();
+}
 
 // Migrations: add columns that may not exist in older DBs
 try { db.exec(`ALTER TABLE feature_requests ADD COLUMN commit_message TEXT NOT NULL DEFAULT ''`) } catch { /* already exists */ }
