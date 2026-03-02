@@ -132,6 +132,13 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS auth_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    expires_at TEXT NOT NULL
+  );
 `);
 
 // Migrations: add columns that may not exist in older DBs

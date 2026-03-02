@@ -1,8 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import db from './db';
+import authRouter, { cleanupExpiredSessions } from './routes/auth';
 import todosRouter from './routes/todos';
 import diaryRouter from './routes/diary';
 import scheduleRouter from './routes/schedule';
@@ -18,8 +23,61 @@ import budgetRouter from './routes/budget';
 const app = express();
 const PORT = 3001;
 
-app.use(cors());
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // SPAのインライン処理を許可
+}));
+
+// Rate limiting
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+// CORS: production は自ドメインのみ、dev は localhost 許可
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? ['https://35-227-242-58.sslip.io']
+  : ['http://localhost:5173', 'http://localhost:3001'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
 app.use(express.json());
+app.use(cookieParser());
+
+// Auth routes (認証不要)
+app.use('/api/auth', authRouter);
+
+// Auth middleware: AUTH_PASSWORD が設定されていれば全 /api/* を保護
+app.use('/api', (req, res, next) => {
+  const authPassword = process.env.AUTH_PASSWORD;
+  if (!authPassword) {
+    next();
+    return;
+  }
+
+  const token = req.cookies?.techo_session;
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const session = db.prepare(
+    'SELECT * FROM auth_sessions WHERE token = ? AND expires_at > datetime(\'now\')'
+  ).get(token);
+
+  if (!session) {
+    res.clearCookie('techo_session', { path: '/' });
+    res.status(401).json({ error: 'Session expired' });
+    return;
+  }
+
+  next();
+});
 
 app.use('/api/todos', todosRouter);
 app.use('/api/diary', diaryRouter);
@@ -44,6 +102,9 @@ if (existsSync(distPath)) {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// Cleanup expired sessions every hour
+setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
