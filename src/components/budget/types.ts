@@ -19,6 +19,7 @@ export interface BudgetPlan {
   subcategory_id: number
   amount: number
   is_recurring: number
+  formula: string | null
   subcategory_name: string
   category_id: number
   category_name: string

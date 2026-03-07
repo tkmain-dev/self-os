@@ -101,9 +101,53 @@ erDiagram
         string created_at
     }
 
+    BUDGET_CATEGORIES {
+        int id PK
+        string name UK
+        string type
+        int sort_order
+    }
+
+    BUDGET_SUBCATEGORIES {
+        int id PK
+        int category_id FK
+        string name
+        int sort_order
+    }
+
+    BUDGET_PLANS {
+        int id PK
+        string year_month
+        int subcategory_id FK
+        int amount
+        int is_recurring
+        string formula
+    }
+
+    BUDGET_INCOME {
+        int id PK
+        string year_month UK
+        int amount
+        int is_recurring
+    }
+
+    BUDGET_ACTUALS {
+        int id PK
+        string year_month
+        string category_name
+        string subcategory_name
+        string date
+        string description
+        int amount
+        string source
+        string csv_id UK
+    }
+
     HABITS ||--o{ HABIT_LOGS : "has"
     HABITS ||--o{ HABITS : "parent_id"
     GOALS ||--o{ GOALS : "parent_id"
+    BUDGET_CATEGORIES ||--o{ BUDGET_SUBCATEGORIES : "has"
+    BUDGET_SUBCATEGORIES ||--o{ BUDGET_PLANS : "has"
 ```
 
 ## テーブル定義
@@ -239,3 +283,62 @@ erDiagram
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
 - **リスト種別**: `wish`（買いたいもの）/ `bucket`（やりたいこと）（CHECK 制約）
+
+### budget_categories（予算カテゴリ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | カテゴリID |
+| name | TEXT | NOT NULL, UNIQUE | カテゴリ名 |
+| type | TEXT | NOT NULL, CHECK('fixed','variable') | 種別（fixed:固定費, variable:変動費） |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+
+- 初回起動時にシードデータ（16カテゴリ）が自動挿入される
+
+### budget_subcategories（予算サブカテゴリ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | サブカテゴリID |
+| category_id | INTEGER | NOT NULL, FK → budget_categories(id) ON DELETE CASCADE | 親カテゴリID |
+| name | TEXT | NOT NULL | サブカテゴリ名 |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+
+- UNIQUE(category_id, name): 同一カテゴリ内で名前の重複不可
+
+### budget_plans（予算計画）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | プランID |
+| year_month | TEXT | NOT NULL | 年月（YYYY-MM） |
+| subcategory_id | INTEGER | NOT NULL, FK → budget_subcategories(id) ON DELETE CASCADE | サブカテゴリID |
+| amount | INTEGER | NOT NULL, DEFAULT 0 | 金額 |
+| is_recurring | INTEGER | NOT NULL, DEFAULT 1 | 毎月繰越フラグ（1:繰越, 0:単月） |
+| formula | TEXT | NULL | 計算式データ（JSON配列） |
+
+- UNIQUE(year_month, subcategory_id): 同一月のサブカテゴリに1レコードのみ
+- **formula**: `[{label, amount, multiplier}]` 形式のJSON。計算式モードで金額を構造化管理する場合に使用。直接入力モードでは null
+
+### budget_income（予算収入）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 収入ID |
+| year_month | TEXT | NOT NULL, UNIQUE | 年月（YYYY-MM） |
+| amount | INTEGER | NOT NULL, DEFAULT 0 | 収入金額 |
+| is_recurring | INTEGER | NOT NULL, DEFAULT 1 | 毎月繰越フラグ |
+
+### budget_actuals（予算実績）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | 実績ID |
+| year_month | TEXT | NOT NULL | 年月（YYYY-MM） |
+| category_name | TEXT | NOT NULL | カテゴリ名 |
+| subcategory_name | TEXT | NOT NULL, DEFAULT '' | サブカテゴリ名 |
+| date | TEXT | NOT NULL | 日付（YYYY-MM-DD） |
+| description | TEXT | NOT NULL, DEFAULT '' | 摘要 |
+| amount | INTEGER | NOT NULL | 金額 |
+| source | TEXT | NOT NULL, DEFAULT '' | 取込元 |
+| csv_id | TEXT | UNIQUE | CSV重複防止ID |

@@ -21,6 +21,7 @@
 | ウィッシュアイテム | `/api/wish-items` | `server/routes/wishItems.ts` |
 | 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
 | 家計簿 | `/api/budget` | `server/routes/budget.ts` |
+| 予算管理 | `/api/budget-mgmt` | `server/routes/budgetManagement.ts` |
 
 ---
 
@@ -401,6 +402,102 @@ JCB実請求  = jcb_billing - jcb_skip
 最終請求額 = au_pay + mufg_billing + JCB実請求
 余剰金額   = 総額 - 最終請求額
 ```
+
+---
+
+## 予算管理 API (`/api/budget-mgmt`)
+
+予算の計画・収入・実績を管理する。カテゴリ/サブカテゴリの階層構造で予算を管理。
+
+### GET `/api/budget-mgmt/categories`
+全カテゴリとサブカテゴリを取得。
+
+**レスポンス**: `200`
+```json
+[{
+  "id": 1,
+  "name": "住宅",
+  "type": "fixed",
+  "sort_order": 0,
+  "subcategories": [
+    { "id": 1, "category_id": 1, "name": "家賃", "sort_order": 0 }
+  ]
+}]
+```
+
+### PUT `/api/budget-mgmt/subcategories/:id`
+サブカテゴリ名を変更。
+
+**リクエスト**: `{ "name": "新しいサブカテゴリ名" }`
+**レスポンス**: `200`
+
+### GET `/api/budget-mgmt/plans/:yearMonth`
+指定月の予算計画を取得。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**レスポンス**: `200`
+```json
+[{
+  "id": 1,
+  "year_month": "2026-03",
+  "subcategory_id": 1,
+  "amount": 80000,
+  "is_recurring": 1,
+  "formula": "[{\"label\":\"家賃\",\"amount\":75000,\"multiplier\":1},{\"label\":\"共益費\",\"amount\":5000,\"multiplier\":1}]",
+  "subcategory_name": "家賃",
+  "category_id": 1
+}]
+```
+
+### PUT `/api/budget-mgmt/plans/:yearMonth`
+指定月の予算計画を一括保存（UPSERT）。金額が0かつ計算式なしの場合はレコード削除。
+
+**リクエスト**:
+```json
+{
+  "plans": [
+    { "subcategory_id": 1, "amount": 80000, "is_recurring": 1, "formula": "[{\"label\":\"家賃\",\"amount\":75000,\"multiplier\":1}]" },
+    { "subcategory_id": 2, "amount": 5000, "is_recurring": 1, "formula": null }
+  ]
+}
+```
+
+- `formula`: 計算式モード時はJSON配列（`[{label, amount, multiplier}]`）、直接入力モード時は `null`
+- `is_recurring`: 1=毎月繰越（前月コピー対象）、0=単月のみ
+
+**レスポンス**: `200`（更新後の全プラン）
+
+### POST `/api/budget-mgmt/plans/:yearMonth/copy-previous`
+前月の繰越対象プラン（`is_recurring=1`）を当月にコピー。当月にプランが既に存在する場合はスキップ。`formula` カラムもコピーされる。
+
+**レスポンス**: `200`
+```json
+{ "copied": 15 }
+```
+
+### GET `/api/budget-mgmt/income/:yearMonth`
+指定月の収入を取得。
+
+### PUT `/api/budget-mgmt/income/:yearMonth`
+指定月の収入を保存（UPSERT）。
+
+**リクエスト**: `{ "amount": 300000, "is_recurring": 1 }`
+
+### POST `/api/budget-mgmt/income/:yearMonth/copy-previous`
+前月の繰越対象収入を当月にコピー。
+
+### GET `/api/budget-mgmt/actuals/:yearMonth`
+指定月の実績一覧を取得。
+
+### GET `/api/budget-mgmt/actuals/:yearMonth/summary`
+指定月の実績をカテゴリ別に集計。
+
+### POST `/api/budget-mgmt/actuals/import`
+CSV データから実績を一括取込。`csv_id` で重複排除。
+
+### DELETE `/api/budget-mgmt/actuals/:yearMonth`
+指定月の実績を全削除。
 
 ---
 

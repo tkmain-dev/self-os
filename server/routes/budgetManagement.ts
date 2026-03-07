@@ -40,6 +40,18 @@ router.post('/subcategories', (req, res) => {
   res.json(sub);
 });
 
+// PUT /api/budget-mgmt/subcategories/:id — rename subcategory
+router.put('/subcategories/:id', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: 'name is required' });
+    return;
+  }
+  db.prepare('UPDATE budget_subcategories SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
+  const sub = db.prepare('SELECT * FROM budget_subcategories WHERE id = ?').get(req.params.id);
+  res.json(sub);
+});
+
 // DELETE /api/budget-mgmt/subcategories/:id
 router.delete('/subcategories/:id', (req, res) => {
   db.prepare('DELETE FROM budget_subcategories WHERE id = ?').run(req.params.id);
@@ -65,7 +77,7 @@ router.get('/plans/:yearMonth', (req, res) => {
 // PUT /api/budget-mgmt/plans/:yearMonth — bulk upsert plans
 router.put('/plans/:yearMonth', (req, res) => {
   const ym = req.params.yearMonth;
-  const { plans } = req.body as { plans: { subcategory_id: number; amount: number; is_recurring: number }[] };
+  const { plans } = req.body as { plans: { subcategory_id: number; amount: number; is_recurring: number; formula?: string | null }[] };
 
   if (!Array.isArray(plans)) {
     res.status(400).json({ error: 'plans array is required' });
@@ -73,19 +85,20 @@ router.put('/plans/:yearMonth', (req, res) => {
   }
 
   const upsert = db.prepare(`
-    INSERT INTO budget_plans (year_month, subcategory_id, amount, is_recurring)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO budget_plans (year_month, subcategory_id, amount, is_recurring, formula)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(year_month, subcategory_id) DO UPDATE SET
       amount = excluded.amount,
-      is_recurring = excluded.is_recurring
+      is_recurring = excluded.is_recurring,
+      formula = excluded.formula
   `);
 
   const tx = db.transaction(() => {
     for (const p of plans) {
-      if (p.amount === 0) {
+      if (p.amount === 0 && !p.formula) {
         db.prepare('DELETE FROM budget_plans WHERE year_month = ? AND subcategory_id = ?').run(ym, p.subcategory_id);
       } else {
-        upsert.run(ym, p.subcategory_id, p.amount, p.is_recurring ?? 1);
+        upsert.run(ym, p.subcategory_id, p.amount, p.is_recurring ?? 1, p.formula ?? null);
       }
     }
   });
@@ -114,8 +127,8 @@ router.post('/plans/:yearMonth/copy-previous', (req, res) => {
   }
 
   const result = db.prepare(`
-    INSERT INTO budget_plans (year_month, subcategory_id, amount, is_recurring)
-    SELECT ?, subcategory_id, amount, is_recurring
+    INSERT INTO budget_plans (year_month, subcategory_id, amount, is_recurring, formula)
+    SELECT ?, subcategory_id, amount, is_recurring, formula
     FROM budget_plans
     WHERE year_month = ? AND is_recurring = 1
   `).run(ym, prevYm);
