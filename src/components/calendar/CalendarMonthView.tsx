@@ -111,7 +111,7 @@ export default function CalendarMonthView({
           <div
             key={label}
             className={`text-center py-2 text-xs font-medium ${
-              i === 5 ? 'text-blue-400/60' : i === 6 ? 'text-red-400/60' : 'text-[#8b8b9e]'
+              i === 6 ? 'text-blue-400/60' : i === 0 ? 'text-red-400/60' : 'text-[#8b8b9e]'
             }`}
           >
             {label}
@@ -151,7 +151,7 @@ export default function CalendarMonthView({
               {week.map((dateStr, dayIdx) => {
                 const isCurrentMonth = dateStr.startsWith(monthPrefix)
                 const isToday = dateStr === today
-                const isWeekend = dayIdx === 5 || dayIdx === 6
+                const isWeekend = dayIdx === 0 || dayIdx === 6
 
                 const daySchedules = eventsByDate.get(dateStr) ?? []
 

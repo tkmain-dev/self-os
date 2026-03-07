@@ -17,7 +17,7 @@ interface HabitLog {
   date: string
 }
 
-const formatDate = (d: Date) => d.toISOString().split('T')[0]
+const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 function getLast7Days(): string[] {
   const days: string[] = []

@@ -10,7 +10,7 @@ interface ScheduleItem {
   memo: string | null
 }
 
-const formatDate = (d: Date) => d.toISOString().split('T')[0]
+const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 const HOUR_HEIGHT = 60 // px per hour
 const START_HOUR = 7

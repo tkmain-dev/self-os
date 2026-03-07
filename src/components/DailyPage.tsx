@@ -34,7 +34,7 @@ interface HabitLog {
 
 
 // ── Helpers ──
-const formatDate = (d: Date) => d.toISOString().split('T')[0]
+const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const dayNames = ['日', '月', '火', '水', '木', '金', '土']
 
 function formatDateLabel(dateStr: string): string {

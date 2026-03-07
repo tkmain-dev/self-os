@@ -1,8 +1,9 @@
 import type { ScheduleItem, GoalItem, CalendarEvent, GoalTreeNode, BandSegment } from './calendarTypes'
 
-export const formatDate = (d: Date): string => d.toISOString().split('T')[0]
+export const formatDate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-export const WEEKDAY_LABELS_SHORT = ['月', '火', '水', '木', '金', '土', '日']
+export const WEEKDAY_LABELS_SHORT = ['日', '月', '火', '水', '木', '金', '土']
 export const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 // ── Band layout constants ──
@@ -15,7 +16,7 @@ const EDGE_INSET = 0.5      // % inset from cell edges for soft boundaries
  */
 export function getMonthGrid(year: number, month: number): string[][] {
   const firstDay = new Date(year, month - 1, 1)
-  const dow = (firstDay.getDay() + 6) % 7
+  const dow = firstDay.getDay() // Sunday = 0
   const startDate = new Date(year, month - 1, 1 - dow)
 
   const grid: string[][] = []
@@ -36,14 +37,14 @@ export function getMonthGrid(year: number, month: number): string[][] {
  */
 export function getWeekDays(dateStr: string): string[] {
   const d = new Date(dateStr + 'T00:00:00')
-  const dow = (d.getDay() + 6) % 7
-  const monday = new Date(d)
-  monday.setDate(d.getDate() - dow)
+  const dow = d.getDay() // Sunday = 0
+  const sunday = new Date(d)
+  sunday.setDate(d.getDate() - dow)
 
   const days: string[] = []
   for (let i = 0; i < 7; i++) {
-    const day = new Date(monday)
-    day.setDate(monday.getDate() + i)
+    const day = new Date(sunday)
+    day.setDate(sunday.getDate() + i)
     days.push(formatDate(day))
   }
   return days

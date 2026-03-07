@@ -46,7 +46,7 @@ const labelClass = 'block text-xs text-[#8b8b9e] font-medium mb-1.5'
 
 function formatDateToday(): string {
   const d = new Date()
-  return d.toISOString().split('T')[0]
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export default function CalendarFormModal({ mode: initialMode, editItem, prefilledDate, prefilledStartTime, prefilledEndTime, onClose, onSaved }: CalendarFormModalProps) {

@@ -55,7 +55,7 @@ export default function CalendarDayPopup({ date, onClose, onEventClick, onNewSch
   const dateDay = new Date(date + 'T00:00:00').getDay()
   const { data: routines } = useApi<RoutineItem[]>(`/api/routines?day=${dateDay}`)
 
-  const isToday = date === new Date().toISOString().split('T')[0]
+  const isToday = date === (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
 
   // ESC to close
   useEffect(() => {
