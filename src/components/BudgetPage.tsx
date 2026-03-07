@@ -18,7 +18,14 @@ interface BudgetEntry {
 
 function currentYearMonth(): string {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  // 15th-closing: day >= 15 → current month's period; day < 15 → previous month's period
+  let y = d.getFullYear()
+  let m = d.getMonth() + 1
+  if (d.getDate() < 15) {
+    m -= 1
+    if (m < 1) { m = 12; y -= 1 }
+  }
+  return `${y}-${String(m).padStart(2, '0')}`
 }
 
 function shiftMonth(ym: string, delta: number): string {
@@ -28,8 +35,12 @@ function shiftMonth(ym: string, delta: number): string {
 }
 
 function formatYearMonth(ym: string): string {
-  const [y, m] = ym.split('-')
-  return `${y}年${Number(m)}月`
+  const [y, m] = ym.split('-').map(Number)
+  // 15th-closing: show period range (e.g., "2026年2月度 (2/15〜3/14)")
+  let endMonth = m + 1
+  let endYear = y
+  if (endMonth > 12) { endMonth = 1; endYear += 1 }
+  return `${y}年${m}月度 (${m}/15〜${endMonth}/14)`
 }
 
 function fmt(v: number | null): string {

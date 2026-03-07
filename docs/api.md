@@ -496,6 +496,8 @@ JCB実請求  = jcb_billing - jcb_skip
 ### POST `/api/budget-mgmt/actuals/import`
 CSV データから実績を一括取込。`csv_id` で重複排除。
 
+**集計期間ルール（15日締め）**: CSV の日付から `year_month` を自動判定。日 >= 15 → その月の期間、日 < 15 → 前月の期間。例: 3/1 の取引 → `2026-02`（2月度）、3/15 の取引 → `2026-03`（3月度）。
+
 ### DELETE `/api/budget-mgmt/actuals/:yearMonth`
 指定月の実績を全削除。
 

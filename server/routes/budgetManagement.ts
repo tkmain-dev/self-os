@@ -239,11 +239,23 @@ router.post('/actuals/import', (req, res) => {
       // Only import rows with 計算対象=1
       if (row.calc !== '1') { skipped++; continue; }
 
-      // Convert date: 2026/03/01 → 2026-03
+      // Convert date: 2026/03/01 → year_month using 15th-closing rule
+      // day >= 15 → that month's period; day < 15 → previous month's period
       const dateParts = row.date.split('/');
       if (dateParts.length < 2) { skipped++; continue; }
-      const yearMonth = `${dateParts[0]}-${dateParts[1].padStart(2, '0')}`;
+      const csvYear = parseInt(dateParts[0], 10);
+      const csvMonth = parseInt(dateParts[1], 10);
+      const csvDay = parseInt(dateParts[2] || '1', 10);
       const dateIso = `${dateParts[0]}-${dateParts[1].padStart(2, '0')}-${(dateParts[2] || '01').padStart(2, '0')}`;
+
+      let periodYear = csvYear;
+      let periodMonth = csvMonth;
+      if (csvDay < 15) {
+        // Before 15th → belongs to previous month's period
+        periodMonth -= 1;
+        if (periodMonth < 1) { periodMonth = 12; periodYear -= 1; }
+      }
+      const yearMonth = `${periodYear}-${String(periodMonth).padStart(2, '0')}`;
 
       const result = insert.run(
         yearMonth,
