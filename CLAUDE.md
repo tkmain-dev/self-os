@@ -18,6 +18,17 @@
 - Branch: main direct push（feature branchは使わない）
 - Deploy: push to main → GitHub Actions auto-deploy → Cloud Run
 
+### 開発の進め方（重要）
+
+- 要件や仕様に不明点・曖昧な点がある場合は、推測で進めずユーザーに確認する
+- 大きな実装は小さなステップに分割し、各ステップごとにユーザーに確認を取る
+- 技術選定やアーキテクチャの判断が必要な場面では、選択肢と推奨案を提示してユーザーと合意してから進める
+
+### コミットメッセージ
+
+- Conventional Commits形式（feat:, fix:, refactor:, docs:, test:, chore:）
+- 日本語で記述（例: `feat: ダイアリーチェックリスト実装`）
+
 ### Git Push 時のドキュメント更新
 
 ユーザーから Git Push の依頼を受けた際は、コミット・プッシュの**前に**必ず以下を実施すること:
@@ -37,6 +48,7 @@
 ### Feature Request ステータス管理
 
 - Feature Request のステータスはユーザーの承認なしに変更しない。
+- **`in_progress`のFRのみ開発対象** — 他ステータスのFRには着手しない。
 - ただし、Feature Request 経由でユーザーが依頼した機能を実装し、ユーザーが承認（「完璧」「完了」「いいです」など肯定的な確認）した場合は、後述の「完了フロー」を実行すること。
 
 ### Feature Request 完了フロー（git push 時）
