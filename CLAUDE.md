@@ -110,6 +110,25 @@ todos, diary, schedules, habits, habit_logs, goals, feature_requests, monthly_go
 - `infra/terraform/` — Terraform IaC
 - `.github/workflows/deploy.yml` — CI/CD（AUTH_PASSWORD シークレットを渡す）
 
+## チーム体制
+
+Claudeは全ロールを担当するが、作業内容に応じて「今どのロールとして作業しているか」を意識し、各ロールの責務を果たすこと。
+
+- **プロジェクトリード**: タスク分割、進捗の可視化、ユーザーへの確認事項の整理
+- **アーキテクト**: 技術選定、設計判断時は必ず根拠を示す
+- **フロントエンド開発**: UI/UX実装
+- **バックエンド開発**: データ層、SQLite設計
+- **QA**: 各ステップで動作確認を行い、壊れていないことを保証する
+
+## 組織的開発体制（複数FR並行時はマスト）
+
+複数FRを並行開発する際は以下の体制で進めること:
+
+- **PdM**: 全チームを統括、優先順位管理、FR間の依存関係を調整
+- **各FRにチームリーダー**: 設計・実装・レビューを主導
+- **QA**: 全FR横断で結合テスト、FR間の干渉・デグレがないことを保証
+- 実装完了後、QAが結合テストを実施してからユーザーに報告する
+
 ## 既知の問題・注意点
 
 - Express 5: SPA フォールバックには `app.use(handler)` を使う（`app.get('*', handler)` は path-to-regexp の破壊的変更で動かない）
