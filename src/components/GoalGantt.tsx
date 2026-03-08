@@ -308,6 +308,7 @@ export default function GoalGantt() {
   const [addParentId, setAddParentId] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [detailGoal, setDetailGoal] = useState<Goal | null>(null)
+  const [hideDone, setHideDone] = useState(false)
 
   // Row drag & drop state
   const [dragRowId, setDragRowId] = useState<number | null>(null)
@@ -361,7 +362,8 @@ export default function GoalGantt() {
   const DAY_WIDTH = ganttWidth > 0 ? ganttWidth / view.days : 12
 
   const tree = useMemo(() => goals ? buildTree(goals) : [], [goals])
-  const flatList = useMemo(() => flattenTree(tree, collapsed), [tree, collapsed])
+  const flatListAll = useMemo(() => flattenTree(tree, collapsed), [tree, collapsed])
+  const flatList = useMemo(() => hideDone ? flatListAll.filter(n => n.status !== 'done') : flatListAll, [flatListAll, hideDone])
 
   // Month markers
   const months = useMemo(() => {
@@ -751,6 +753,10 @@ export default function GoalGantt() {
           <button onClick={() => setOffset(0)} className="px-2 py-1 bg-[#1e1e2a] text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/10 text-xs transition-colors">今日</button>
           <button onClick={() => setOffset(o => o + getNavStep(viewRange))} className="px-2 py-1 bg-[#1e1e2a] border border-[#2a2a3a] rounded-lg hover:bg-[#252535] text-[#8b8b9e] hover:text-[#e4e4ec] text-xs transition-colors">&rarr;</button>
         </div>
+        <button onClick={() => setHideDone(h => !h)}
+          className={`px-2.5 py-1 rounded-md text-xs transition-colors border ${hideDone ? 'bg-green-900/30 text-green-400 border-green-500/40' : 'bg-[#1e1e2a] text-[#8b8b9e] border-[#2a2a3a] hover:text-[#e4e4ec]'}`}>
+          {hideDone ? '完了を非表示中' : '完了を非表示'}
+        </button>
         {selected.size > 0 && (
           <button onClick={handleBulkDelete}
             className="ml-auto bg-red-600 text-white px-4 py-1.5 rounded-lg hover:bg-red-500 text-sm transition-colors">
