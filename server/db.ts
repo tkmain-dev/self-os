@@ -270,4 +270,25 @@ try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_label TEXT`) } catch { /* 
 try { db.exec(`ALTER TABLE budget_plans ADD COLUMN formula TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE budget_income ADD COLUMN savings_target INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
 
+// ── FR#47: ポイント残高 + ウィッシュ月度計画 ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS point_balances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    point_type TEXT NOT NULL CHECK(point_type IN ('jcb_jpoint', 'amazon', 'welfare')),
+    balance INTEGER NOT NULL DEFAULT 0,
+    exchange_rate REAL NOT NULL DEFAULT 1.0,
+    exchange_label TEXT NOT NULL DEFAULT '',
+    UNIQUE(year_month, point_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS wish_month_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    wish_item_id INTEGER NOT NULL,
+    FOREIGN KEY (wish_item_id) REFERENCES wish_items(id) ON DELETE CASCADE,
+    UNIQUE(year_month, wish_item_id)
+  );
+`);
+
 export default db;

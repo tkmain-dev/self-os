@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useApi, apiPut, apiPost, apiDelete } from '../../hooks/useApi'
-import type { BudgetCategory, BudgetPlan, BudgetIncome } from './types'
+import type { BudgetCategory, BudgetPlan, BudgetIncome, PointBalance } from './types'
+import { POINT_TYPES } from './types'
+
+interface WishItemForPlan {
+  id: number; title: string; price: number | null; deadline: string | null; done: number
+}
 
 function fmt(v: number): string {
   return `¥${Math.abs(v).toLocaleString()}`
@@ -352,13 +357,29 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
   const { data: categories, loading: catLoading, refetch: refetchCategories } = useApi<BudgetCategory[]>('/api/budget-mgmt/categories')
   const { data: plans, refetch: refetchPlans } = useApi<BudgetPlan[]>(`/api/budget-mgmt/plans/${yearMonth}`)
   const { data: income, refetch: refetchIncome } = useApi<BudgetIncome>(`/api/budget-mgmt/income/${yearMonth}`)
+  const { data: pointsData, refetch: refetchPoints } = useApi<PointBalance[]>(`/api/budget-mgmt/points/${yearMonth}`)
+  const { data: wishItems } = useApi<WishItemForPlan[]>('/api/wish-items?type=wish')
 
   const [incomeRaw, setIncomeRaw] = useState('')
   const [incomeRecurring, setIncomeRecurring] = useState(1)
   const [savingsRaw, setSavingsRaw] = useState('')
+  const [pointDrafts, setPointDrafts] = useState<Record<string, { balance: string; exchange_rate: number; exchange_label: string }>>({})
   const [addingTo, setAddingTo] = useState<number | null>(null)
   const [newSubName, setNewSubName] = useState('')
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    const drafts: typeof pointDrafts = {}
+    for (const [key, def] of Object.entries(POINT_TYPES)) {
+      const saved = pointsData?.find(p => p.point_type === key)
+      drafts[key] = {
+        balance: saved ? String(saved.balance) : '',
+        exchange_rate: saved?.exchange_rate ?? def.options[0].rate,
+        exchange_label: saved?.exchange_label || def.options[0].label,
+      }
+    }
+    setPointDrafts(drafts)
+  }, [pointsData])
 
   useEffect(() => {
     if (income) {
@@ -388,6 +409,17 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     refetchIncome()
   }, [yearMonth, incomeRaw, savingsRaw, incomeRecurring, refetchIncome])
 
+  const savePoints = useCallback(async () => {
+    const arr = Object.entries(pointDrafts).map(([key, d]) => ({
+      point_type: key,
+      balance: parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0,
+      exchange_rate: d.exchange_rate,
+      exchange_label: d.exchange_label,
+    }))
+    await apiPut(`/api/budget-mgmt/points/${yearMonth}`, { points: arr })
+    refetchPoints()
+  }, [yearMonth, pointDrafts, refetchPoints])
+
   const copyPrevious = async () => {
     await apiPost(`/api/budget-mgmt/plans/${yearMonth}/copy-previous`, {})
     await apiPost(`/api/budget-mgmt/income/${yearMonth}/copy-previous`, {})
@@ -414,10 +446,16 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     refetchCategories()
   }, [refetchCategories])
 
-  if (catLoading) return <div className="text-[#5a5a6e] text-sm py-8 text-center">読み込み中...</div>
-
-  const totalBudget = plans?.reduce((sum, p) => sum + p.amount, 0) ?? 0
-  const savingsTarget = (income?.amount ?? 0) - totalBudget
+  // Auto-pick wish items by deadline in budget month range (must be before early return)
+  const plannedItems = useMemo(() => {
+    if (!wishItems) return []
+    const [y, m] = yearMonth.split('-').map(Number)
+    const from = `${y}-${String(m).padStart(2, '0')}-15`
+    const nextM = m === 12 ? 1 : m + 1
+    const nextY = m === 12 ? y + 1 : y
+    const to = `${nextY}-${String(nextM).padStart(2, '0')}-14`
+    return wishItems.filter(i => !i.done && i.deadline && i.deadline >= from && i.deadline <= to)
+  }, [wishItems, yearMonth])
 
   const toggleCat = (catId: number) => {
     setExpandedCats(prev => {
@@ -428,13 +466,29 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     })
   }
 
+  if (catLoading) return <div className="text-[#5a5a6e] text-sm py-8 text-center">読み込み中...</div>
+
+  const totalBudget = plans?.reduce((sum, p) => sum + p.amount, 0) ?? 0
+  const savingsTarget = (income?.amount ?? 0) - totalBudget
+  const wishAllocated = plannedItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
+
+  // Purchase power calculation
+  const surplusBudget = savingsTarget - (income?.savings_target ?? 0)
+  const pointYenTotal = Object.entries(pointDrafts).reduce((sum, [, d]) => {
+    const b = parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0
+    return sum + Math.floor(b * d.exchange_rate)
+  }, 0)
+  const purchasePower = surplusBudget + pointYenTotal
+
   const fixedTotal = categories?.filter(c => c.type === 'fixed')
     .reduce((sum, cat) => sum + cat.subcategories.reduce((s, sub) => s + (planMap.get(sub.id)?.amount ?? 0), 0), 0) ?? 0
   const variableTotal = categories?.filter(c => c.type === 'variable')
     .reduce((sum, cat) => sum + cat.subcategories.reduce((s, sub) => s + (planMap.get(sub.id)?.amount ?? 0), 0), 0) ?? 0
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Left column: Summary + Income + Points + Purchase power */}
+      <div className="space-y-4">
       {/* Summary */}
       <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
         <div className="px-5 py-3 border-b border-[#2a2a3a] flex items-center justify-between bg-gradient-to-r from-amber-500/8 from-[#16161e]">
@@ -532,7 +586,117 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
         </div>
       </div>
 
-      {/* Category sections */}
+      {/* Point balances */}
+      <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-violet-500/8 from-[#16161e]">
+          <span className="text-sm font-semibold text-[#e4e4ec]">ポイント資産</span>
+        </div>
+        <div className="px-5">
+          {Object.entries(POINT_TYPES).map(([key, def]) => {
+            const draft = pointDrafts[key]
+            if (!draft) return null
+            const balanceNum = parseInt(draft.balance.replace(/,/g, '') || '0', 10) || 0
+            const yenValue = Math.floor(balanceNum * draft.exchange_rate)
+            return (
+              <div key={key} className="flex items-center gap-2 py-2.5 border-b border-[#1e1e2a] last:border-0">
+                <span className="text-sm text-[#8b8b9e] flex-1">{def.label}</span>
+                {def.options.length > 1 && (
+                  <select
+                    value={draft.exchange_label}
+                    onChange={e => {
+                      const opt = def.options.find(o => o.label === e.target.value)
+                      if (!opt) return
+                      setPointDrafts(prev => {
+                        const next = { ...prev, [key]: { ...prev[key], exchange_rate: opt.rate, exchange_label: opt.label } }
+                        // Save immediately with updated state
+                        const arr = Object.entries(next).map(([k, d]) => ({
+                          point_type: k,
+                          balance: parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0,
+                          exchange_rate: d.exchange_rate,
+                          exchange_label: d.exchange_label,
+                        }))
+                        apiPut(`/api/budget-mgmt/points/${yearMonth}`, { points: arr })
+                        return next
+                      })
+                    }}
+                    className="bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-1.5 py-1 text-[10px] text-[#e4e4ec] focus:outline-none focus:border-violet-500/50 cursor-pointer"
+                  >
+                    {def.options.map(o => (
+                      <option key={o.label} value={o.label}>{o.label} ({o.rate}円/pt)</option>
+                    ))}
+                  </select>
+                )}
+                <div className="relative shrink-0">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={draft.balance}
+                    onChange={e => setPointDrafts(prev => ({ ...prev, [key]: { ...prev[key], balance: e.target.value } }))}
+                    onBlur={savePoints}
+                    placeholder="0"
+                    className="w-24 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pr-7 pl-2 py-1 text-sm text-right text-white placeholder-[#3a3a4a] focus:border-violet-500/50 focus:outline-none transition-colors"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#5a5a6e]">pt</span>
+                </div>
+                {balanceNum > 0 && (
+                  <span className="text-xs font-mono text-violet-300 shrink-0 w-16 text-right">{fmt(yenValue)}</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Purchase power */}
+      <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-amber-500/8 from-[#16161e]">
+          <span className="text-sm font-semibold text-[#e4e4ec]">購入可能額</span>
+        </div>
+        <div className="px-5 py-1">
+          <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+            <span className="text-sm text-[#8b8b9e]">余剰予算</span>
+            <span className="text-xs font-mono text-[#e4e4ec]">{fmt(surplusBudget)}</span>
+          </div>
+          {pointYenTotal > 0 && (
+            <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+              <span className="text-sm text-[#8b8b9e]">ポイント資産</span>
+              <span className="text-xs font-mono text-violet-300">{fmt(pointYenTotal)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+            <span className="text-sm font-semibold text-[#e4e4ec]">購入可能額</span>
+            <span className={`text-sm font-mono font-bold ${purchasePower >= 0 ? 'text-amber-300' : 'text-red-400'}`}>
+              {fmt(purchasePower)}
+            </span>
+          </div>
+          {plannedItems.length > 0 && (
+            <>
+              <div className="text-[10px] text-[#5a5a6e] mt-2 mb-1">今月の購入予定</div>
+              {plannedItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between py-1">
+                  <span className="text-xs text-[#c0c0d0] truncate flex-1">{item.title}</span>
+                  <span className="text-[10px] text-[#5a5a6e] shrink-0 ml-2">{item.deadline?.slice(5).replace('-', '/')}</span>
+                  <span className="text-xs font-mono text-[#e4e4ec] shrink-0 ml-2 w-16 text-right">{item.price ? fmt(item.price) : '—'}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between py-1.5 border-t border-[#1e1e2a] mt-1">
+                <span className="text-xs text-[#8b8b9e]">購入予定合計</span>
+                <span className="text-xs font-mono text-[#e4e4ec]">{fmt(wishAllocated)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex items-center justify-between py-2.5 border-t border-[#2a2a3a]">
+            <span className="text-sm font-semibold text-[#e4e4ec]">残り購入可能額</span>
+            <span className={`text-sm font-mono font-bold ${(purchasePower - wishAllocated) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+              {fmt(purchasePower - wishAllocated)}
+            </span>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      {/* Right column: Category sections */}
+      <div className="space-y-4">
       {['fixed', 'variable'].map(type => (
         <div key={type}>
           <h3 className="text-xs font-bold text-[#5a5a6e] uppercase tracking-wider mb-2 px-1">
@@ -606,6 +770,7 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
           </div>
         </div>
       ))}
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useApi } from '../hooks/useApi'
 import DatePicker from './DatePicker'
 import DiaryChecklist from './DiaryChecklist'
@@ -119,6 +119,24 @@ function formatDateLabel(dateStr: string) {
   return `${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`
 }
 
+function currentBudgetMonth(): string {
+  const d = new Date()
+  let y = d.getFullYear(), m = d.getMonth() + 1
+  if (d.getDate() < 15) { m -= 1; if (m < 1) { m = 12; y -= 1 } }
+  return `${y}-${String(m).padStart(2, '0')}`
+}
+
+function budgetMonthRange(ym: string): { from: string; to: string } {
+  const [y, m] = ym.split('-').map(Number)
+  const from = `${y}-${String(m).padStart(2, '0')}-15`
+  const nextM = m === 12 ? 1 : m + 1
+  const nextY = m === 12 ? y + 1 : y
+  const to = `${nextY}-${String(nextM).padStart(2, '0')}-14`
+  return { from, to }
+}
+
+interface PointBal { balance: number; exchange_rate: number }
+
 function shiftDate(dateStr: string, delta: number) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + delta)
@@ -161,6 +179,31 @@ export default function WishListPage() {
   const [ticketItem, setTicketItem] = useState<WishItem | null>(null)
   const { data: goals } = useApi<Goal[]>('/api/goals')
   const epics = (goals ?? []).filter(g => g.issue_type === 'epic')
+
+  // Budget integration (wish tab only) — auto-pick by deadline in budget month range
+  const budgetMonth = useMemo(() => currentBudgetMonth(), [])
+  const bmRange = useMemo(() => budgetMonthRange(budgetMonth), [budgetMonth])
+  const { data: pointsData } = useApi<PointBal[]>(`/api/budget-mgmt/points/${budgetMonth}`)
+  const { data: budgetIncome } = useApi<{ amount: number; savings_target: number }>(`/api/budget-mgmt/income/${budgetMonth}`)
+  const { data: budgetPlans } = useApi<{ amount: number }[]>(`/api/budget-mgmt/plans/${budgetMonth}`)
+
+  const plannedItems = useMemo(() => {
+    if (!items) return []
+    return items.filter(i => !i.done && i.deadline && i.deadline >= bmRange.from && i.deadline <= bmRange.to)
+  }, [items, bmRange])
+
+  const purchasePower = useMemo(() => {
+    const incomeAmt = budgetIncome?.amount ?? 0
+    const savingsTarget = budgetIncome?.savings_target ?? 0
+    const totalBudget = budgetPlans?.reduce((s, p) => s + p.amount, 0) ?? 0
+    const surplus = incomeAmt - totalBudget - savingsTarget
+    const pointYen = pointsData?.reduce((s, p) => s + Math.floor(p.balance * p.exchange_rate), 0) ?? 0
+    return surplus + pointYen
+  }, [budgetIncome, budgetPlans, pointsData])
+
+  const wishAllocated = useMemo(() => {
+    return plannedItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
+  }, [plannedItems])
 
   const theme = themes[activeTab]
   const isEditMode = showForm || editingId !== null
@@ -386,6 +429,42 @@ export default function WishListPage() {
             <span className="text-lg leading-none">+</span> 追加
           </button>
         </div>
+
+        {/* Purchase power summary (wish tab only) */}
+        {activeTab === 'wish' && (
+          <div className="mb-4 bg-[#16161e] rounded-xl border border-[#2a2a3a] px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#8b8b9e]">今月の購入可能額</span>
+              <span className={`text-sm font-mono font-bold ${purchasePower >= 0 ? 'text-amber-300' : 'text-red-400'}`}>
+                ¥{purchasePower.toLocaleString()}
+              </span>
+            </div>
+            {plannedItems.length > 0 && (
+              <>
+                <div className="border-t border-[#2a2a3a] pt-2">
+                  <div className="text-[10px] text-[#5a5a6e] mb-1">今月の購入予定</div>
+                  {plannedItems.map(item => (
+                    <div key={item.id} className="flex items-center justify-between py-0.5">
+                      <span className="text-xs text-[#c0c0d0] truncate flex-1">{item.title}</span>
+                      <span className="text-[10px] text-[#5a5a6e] shrink-0 ml-2">{item.deadline?.slice(5).replace('-', '/')}</span>
+                      <span className="text-xs font-mono text-[#e4e4ec] shrink-0 ml-2 w-16 text-right">{item.price ? `¥${item.price.toLocaleString()}` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between border-t border-[#2a2a3a] pt-2">
+                  <span className="text-xs text-[#8b8b9e]">購入予定合計 ({plannedItems.length}件)</span>
+                  <span className="text-xs font-mono text-[#e4e4ec]">¥{wishAllocated.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#8b8b9e]">残り</span>
+                  <span className={`text-xs font-mono font-bold ${(purchasePower - wishAllocated) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                    ¥{(purchasePower - wishAllocated).toLocaleString()}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Error display */}
         {error && (

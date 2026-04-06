@@ -308,7 +308,7 @@ export default function BudgetPage() {
   const [activeTab, setActiveTab] = useState<Tab>('billing')
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-4 pb-4 border-b border-[#2a2a3a] -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1 bg-gradient-to-r from-emerald-500/8 to-transparent">
         <h1 className="text-2xl font-bold text-white tracking-wide mb-1">家計簿</h1>
@@ -360,10 +360,17 @@ export default function BudgetPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'billing' && <BillingTab yearMonth={yearMonth} />}
-      {activeTab === 'plan' && <BudgetPlanTab yearMonth={yearMonth} />}
-      {activeTab === 'import' && <CsvImportTab yearMonth={yearMonth} />}
-      {activeTab === 'comparison' && <ComparisonTab yearMonth={yearMonth} />}
+      {activeTab === 'plan' || activeTab === 'comparison' ? (
+        <>
+          {activeTab === 'plan' && <BudgetPlanTab yearMonth={yearMonth} />}
+          {activeTab === 'comparison' && <ComparisonTab yearMonth={yearMonth} />}
+        </>
+      ) : (
+        <div className="max-w-2xl mx-auto">
+          {activeTab === 'billing' && <BillingTab yearMonth={yearMonth} />}
+          {activeTab === 'import' && <CsvImportTab yearMonth={yearMonth} />}
+        </div>
+      )}
     </div>
   )
 }

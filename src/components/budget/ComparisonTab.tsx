@@ -38,7 +38,6 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
   const { data: plans } = useApi<BudgetPlan[]>(`/api/budget-mgmt/plans/${yearMonth}`)
   const { data: income } = useApi<BudgetIncome>(`/api/budget-mgmt/income/${yearMonth}`)
   const { data: actualSummary } = useApi<ActualSummary[]>(`/api/budget-mgmt/actuals/${yearMonth}/summary`)
-
   if (!categories || !plans || !actualSummary) {
     return <div className="text-[#5a5a6e] text-sm py-8 text-center">読み込み中...</div>
   }
@@ -80,27 +79,9 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
   allCatNames.delete('現金・カード')
 
   return (
-    <div className="space-y-4">
-      {/* Income row */}
-      <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-emerald-500/8 from-[#16161e]">
-          <span className="text-sm font-semibold text-[#e4e4ec]">収入</span>
-        </div>
-        <div className="px-5 py-2">
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm text-[#8b8b9e]">予算</span>
-            <span className="text-sm font-mono text-[#e4e4ec]">{fmt(incomeAmount)}</span>
-          </div>
-          {actualIncome > 0 && (
-            <div className="flex items-center justify-between py-2 border-t border-[#1e1e2a]">
-              <span className="text-sm text-[#8b8b9e]">実績</span>
-              <span className="text-sm font-mono text-emerald-400">{fmt(actualIncome)}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Expense comparison by type */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Left column: Expense details */}
+      <div className="space-y-4">
       {['fixed', 'variable'].map(type => {
         const typeCats = categories.filter(c => c.type === type)
         const relevantCats = typeCats.filter(c => allCatNames.has(c.name))
@@ -165,6 +146,28 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
           </div>
         )
       })}
+      </div>
+
+      {/* Right column: Income + Total summary */}
+      <div className="space-y-4">
+      {/* Income */}
+      <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-emerald-500/8 from-[#16161e]">
+          <span className="text-sm font-semibold text-[#e4e4ec]">収入</span>
+        </div>
+        <div className="px-5 py-2">
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-[#8b8b9e]">予算</span>
+            <span className="text-sm font-mono text-[#e4e4ec]">{fmt(incomeAmount)}</span>
+          </div>
+          {actualIncome > 0 && (
+            <div className="flex items-center justify-between py-2 border-t border-[#1e1e2a]">
+              <span className="text-sm text-[#8b8b9e]">実績</span>
+              <span className="text-sm font-mono text-emerald-400">{fmt(actualIncome)}</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Total summary */}
       <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
@@ -230,6 +233,7 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

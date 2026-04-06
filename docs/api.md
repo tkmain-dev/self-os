@@ -22,6 +22,8 @@
 | 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
 | 家計簿 | `/api/budget` | `server/routes/budget.ts` |
 | 予算管理 | `/api/budget-mgmt` | `server/routes/budgetManagement.ts` |
+| ポイント残高 | `/api/budget-mgmt/points` | `server/routes/budgetManagement.ts` |
+| 月度購入計画 | `/api/budget-mgmt/wish-plans` | `server/routes/budgetManagement.ts` |
 | KPT | `/api/kpt` | `server/routes/kpt.ts` |
 
 ---
@@ -508,6 +510,83 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 
 ### DELETE `/api/budget-mgmt/actuals/:yearMonth`
 指定月の実績を全削除。
+
+---
+
+### GET `/api/budget-mgmt/points/:yearMonth`
+指定月のポイント残高を全種別取得。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**レスポンス**: `200`
+```json
+[
+  { "id": 1, "year_month": "2026-03", "point_type": "jcb",    "balance": 5000, "exchange_rate": 0.3,  "updated_at": "..." },
+  { "id": 2, "year_month": "2026-03", "point_type": "amazon",  "balance": 1200, "exchange_rate": 1.0,  "updated_at": "..." },
+  { "id": 3, "year_month": "2026-03", "point_type": "fukuri",  "balance": 3000, "exchange_rate": 1.0,  "updated_at": "..." }
+]
+```
+
+### PUT `/api/budget-mgmt/points/:yearMonth`
+指定月のポイント残高を一括保存（UPSERT）。送信したレコードのみ更新される。
+
+**リクエスト**:
+```json
+[
+  { "point_type": "jcb",   "balance": 5000, "exchange_rate": 0.3 },
+  { "point_type": "amazon","balance": 1200, "exchange_rate": 1.0 },
+  { "point_type": "fukuri","balance": 3000, "exchange_rate": 1.0 }
+]
+```
+
+- `point_type`: `jcb` / `amazon` / `fukuri`
+- `exchange_rate`: 1ポイント = N円。円換算額はフロントエンドで `balance × exchange_rate` として計算
+
+**レスポンス**: `200`（更新後の全ポイントレコード）
+
+---
+
+### GET `/api/budget-mgmt/wish-plans/:yearMonth`
+指定月の購入計画を取得（wish_items の詳細を JOIN して返す）。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**レスポンス**: `200`
+```json
+[
+  {
+    "id": 1,
+    "year_month": "2026-03",
+    "wish_item_id": 5,
+    "planned_amount": 29800,
+    "memo": "セール価格",
+    "created_at": "...",
+    "title": "AirPods Pro",
+    "price": 29800,
+    "deadline": "2026-03-31"
+  }
+]
+```
+
+### POST `/api/budget-mgmt/wish-plans/:yearMonth`
+指定月の購入計画にアイテムを追加。
+
+**リクエスト**:
+```json
+{ "wish_item_id": 5, "planned_amount": 29800, "memo": "セール価格" }
+```
+
+- `planned_amount` はオプション（省略時は wish_items の price を使用）
+- `memo` はオプション
+
+**レスポンス**: `201`（作成されたレコード）
+
+### DELETE `/api/budget-mgmt/wish-plans/:yearMonth/:id`
+指定月の購入計画エントリを削除。
+
+**パラメータ**: `yearMonth` — YYYY-MM、`id` — wish_month_plans.id
+
+**レスポンス**: `204`
 
 ---
 

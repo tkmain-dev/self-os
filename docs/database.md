@@ -144,6 +144,24 @@ erDiagram
         string csv_id UK
     }
 
+    POINT_BALANCES {
+        int id PK
+        string year_month
+        string point_type UK2
+        int balance
+        real exchange_rate
+        string updated_at
+    }
+
+    WISH_MONTH_PLANS {
+        int id PK
+        string year_month
+        int wish_item_id FK
+        int planned_amount
+        string memo
+        string created_at
+    }
+
     HABITS ||--o{ HABIT_LOGS : "has"
     HABITS ||--o{ HABITS : "parent_id"
     GOALS ||--o{ GOALS : "parent_id"
@@ -174,6 +192,7 @@ erDiagram
     BUDGET_SUBCATEGORIES ||--o{ BUDGET_PLANS : "has"
     KPT_CATEGORIES ||--o{ KPT_ENTRIES : "has"
     KPT_ENTRIES ||--o{ KPT_ENTRIES : "carried_from_id"
+    WISH_ITEMS ||--o{ WISH_MONTH_PLANS : "has"
 ```
 
 ## テーブル定義
@@ -400,3 +419,33 @@ erDiagram
 - **引き継ぎ**: `carried_from_id` で元エントリを参照。Keep の週間継続、Try→Keep 昇格、Problem の未解決引き継ぎに使用
 - **自動昇格**: Try に content を保存すると自動的に次週の Keep エントリが作成される
 - **Problem 引き継ぎ**: 未解決/部分解決と評価された Problem は自動的に次週に引き継がれる（理由付き）
+
+### point_balances（ポイント残高）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| year_month | TEXT | NOT NULL | 年月（YYYY-MM） |
+| point_type | TEXT | NOT NULL | ポイント種別（例: `jcb`, `amazon`, `fukuri`） |
+| balance | INTEGER | NOT NULL, DEFAULT 0 | ポイント残高 |
+| exchange_rate | REAL | NOT NULL, DEFAULT 1.0 | 円換算レート（1ポイント = N円） |
+| updated_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 更新日時 |
+
+- UNIQUE(year_month, point_type): 同一月・同一種別に1レコードのみ
+- **円換算額**: `balance × exchange_rate` で計算。予算設定タブの「購入可能額」算出に使用
+- **ポイント種別**: `jcb`（JCB J-POINT）/ `amazon`（Amazon ポイント）/ `fukuri`（福利厚生ポイント）
+- **交換レート**: 選択式（例: JCBは0.3〜1.0円/pt）。フロントエンドでプリセット選択肢を提供
+
+### wish_month_plans（月度購入計画）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | プランID |
+| year_month | TEXT | NOT NULL | 年月（YYYY-MM） |
+| wish_item_id | INTEGER | NOT NULL, FK → wish_items(id) ON DELETE CASCADE | 対象ウィッシュアイテムID |
+| planned_amount | INTEGER | NOT NULL, DEFAULT 0 | 計画金額 |
+| memo | TEXT | NULL | メモ |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+
+- **現在の利用状況**: テーブルは作成済みだが現時点では未使用。将来的な月度購入計画機能で使用予定
+- ウィッシュアイテムが削除された場合は CASCADE 削除

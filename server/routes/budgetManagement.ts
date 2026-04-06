@@ -284,4 +284,74 @@ router.delete('/actuals/:yearMonth', (req, res) => {
   res.json({ deleted: result.changes });
 });
 
+// ── Point Balances ──
+
+// GET /api/budget-mgmt/points/:yearMonth
+router.get('/points/:yearMonth', (req, res) => {
+  const rows = db.prepare('SELECT * FROM point_balances WHERE year_month = ?').all(req.params.yearMonth);
+  res.json(rows);
+});
+
+// PUT /api/budget-mgmt/points/:yearMonth — bulk upsert
+router.put('/points/:yearMonth', (req, res) => {
+  const ym = req.params.yearMonth;
+  const { points } = req.body as {
+    points: { point_type: string; balance: number; exchange_rate: number; exchange_label: string }[];
+  };
+  if (!Array.isArray(points)) { res.status(400).json({ error: 'points array required' }); return; }
+
+  const upsert = db.prepare(`
+    INSERT INTO point_balances (year_month, point_type, balance, exchange_rate, exchange_label)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(year_month, point_type) DO UPDATE SET balance = excluded.balance, exchange_rate = excluded.exchange_rate, exchange_label = excluded.exchange_label
+  `);
+  const del = db.prepare('DELETE FROM point_balances WHERE year_month = ? AND point_type = ?');
+
+  const tx = db.transaction(() => {
+    for (const p of points) {
+      if (p.balance === 0) {
+        del.run(ym, p.point_type);
+      } else {
+        upsert.run(ym, p.point_type, p.balance, p.exchange_rate, p.exchange_label);
+      }
+    }
+  });
+  tx();
+
+  const rows = db.prepare('SELECT * FROM point_balances WHERE year_month = ?').all(ym);
+  res.json(rows);
+});
+
+// ── Wish Month Plans ──
+
+// GET /api/budget-mgmt/wish-plans/:yearMonth
+router.get('/wish-plans/:yearMonth', (req, res) => {
+  const rows = db.prepare(
+    `SELECT wmp.id, wmp.year_month, wmp.wish_item_id, wi.title, wi.price
+     FROM wish_month_plans wmp
+     JOIN wish_items wi ON wmp.wish_item_id = wi.id
+     WHERE wmp.year_month = ?
+     ORDER BY wi.sort_order`
+  ).all(req.params.yearMonth);
+  res.json(rows);
+});
+
+// POST /api/budget-mgmt/wish-plans/:yearMonth
+router.post('/wish-plans/:yearMonth', (req, res) => {
+  const { wish_item_id } = req.body;
+  if (!wish_item_id) { res.status(400).json({ error: 'wish_item_id required' }); return; }
+  try {
+    db.prepare('INSERT INTO wish_month_plans (year_month, wish_item_id) VALUES (?, ?)').run(req.params.yearMonth, wish_item_id);
+    res.json({ ok: true });
+  } catch {
+    res.status(409).json({ error: 'Already planned' });
+  }
+});
+
+// DELETE /api/budget-mgmt/wish-plans/:yearMonth/:wishItemId
+router.delete('/wish-plans/:yearMonth/:wishItemId', (req, res) => {
+  db.prepare('DELETE FROM wish_month_plans WHERE year_month = ? AND wish_item_id = ?').run(req.params.yearMonth, req.params.wishItemId);
+  res.json({ ok: true });
+});
+
 export default router;

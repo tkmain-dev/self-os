@@ -49,3 +49,41 @@ export interface ActualSummary {
   category_name: string
   total: number
 }
+
+export interface PointBalance {
+  id?: number
+  year_month: string
+  point_type: 'jcb_jpoint' | 'amazon' | 'welfare'
+  balance: number
+  exchange_rate: number
+  exchange_label: string
+}
+
+export interface WishMonthPlan {
+  id: number
+  year_month: string
+  wish_item_id: number
+  title: string
+  price: number | null
+}
+
+export const POINT_TYPES = {
+  jcb_jpoint: {
+    label: 'JCB J-POINT',
+    options: [
+      { label: 'MyJCB Pay', rate: 1.0 },
+      { label: 'JCBギフトカード', rate: 1.0 },
+      { label: 'カード支払い充当', rate: 0.7 },
+      { label: 'Amazon利用', rate: 0.7 },
+      { label: '他社ポイント交換', rate: 0.7 },
+    ],
+  },
+  amazon: {
+    label: 'Amazonポイント',
+    options: [{ label: 'Amazonポイント', rate: 1.0 }],
+  },
+  welfare: {
+    label: '福利厚生ポイント',
+    options: [{ label: '福利厚生ポイント', rate: 1.0 }],
+  },
+} as const
