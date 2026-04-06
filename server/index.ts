@@ -3,9 +3,21 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Load .env.local if present (for local dev secrets like ANTHROPIC_API_KEY)
+const __dirname_env = path.dirname(fileURLToPath(import.meta.url));
+const envLocalPath = path.join(__dirname_env, '..', '.env.local');
+if (existsSync(envLocalPath)) {
+  for (const line of readFileSync(envLocalPath, 'utf8').split('\n')) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match && !process.env[match[1].trim()]) {
+      process.env[match[1].trim()] = match[2].trim();
+    }
+  }
+}
 import db from './db';
 import authRouter, { cleanupExpiredSessions } from './routes/auth';
 import todosRouter from './routes/todos';

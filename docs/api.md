@@ -24,6 +24,7 @@
 | 予算管理 | `/api/budget-mgmt` | `server/routes/budgetManagement.ts` |
 | ポイント残高 | `/api/budget-mgmt/points` | `server/routes/budgetManagement.ts` |
 | 月度購入計画 | `/api/budget-mgmt/wish-plans` | `server/routes/budgetManagement.ts` |
+| AI分析 | `/api/budget-mgmt/analysis` | `server/routes/budgetManagement.ts` |
 | KPT | `/api/kpt` | `server/routes/kpt.ts` |
 
 ---
@@ -472,7 +473,7 @@ JCB実請求  = jcb_billing - jcb_skip
 **レスポンス**: `200`（更新後の全プラン）
 
 ### POST `/api/budget-mgmt/plans/:yearMonth/copy-previous`
-前月の繰越対象プラン（`is_recurring=1`）を当月にコピー。当月にプランが既に存在する場合はスキップ。`formula` カラムもコピーされる。
+前月の繰越対象プラン（`is_recurring=1`）を当月にコピー（UPSERT）。`formula` カラムもコピーされる。当月に既存プランがある場合は上書きされるため、再コピーで前月の値に戻すことが可能。
 
 **レスポンス**: `200`
 ```json
@@ -490,7 +491,7 @@ JCB実請求  = jcb_billing - jcb_skip
 - `savings_target`: 貯金目標額（省略時は null。予実比較タブで余剰予算の計算に使用）
 
 ### POST `/api/budget-mgmt/income/:yearMonth/copy-previous`
-前月の繰越対象収入を当月にコピー。
+前月の繰越対象収入を当月にコピー（UPSERT）。当月に既存データがある場合は上書き。再コピーで前月の値に戻すことが可能。
 
 ### GET `/api/budget-mgmt/actuals/:yearMonth`
 指定月の実績一覧を取得。
@@ -587,6 +588,66 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 **パラメータ**: `yearMonth` — YYYY-MM、`id` — wish_month_plans.id
 
 **レスポンス**: `204`
+
+---
+
+### GET `/api/budget-mgmt/analysis/:yearMonth`
+指定月の AI 分析結果をキャッシュから取得。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**レスポンス**: `200`（キャッシュ有り）
+```json
+{
+  "year_month": "2026-03",
+  "result": { "...": "分析結果JSON" },
+  "created_at": "2026-04-01 12:00:00"
+}
+```
+
+**レスポンス**: `404`（未分析 / キャッシュなし）
+
+### POST `/api/budget-mgmt/analysis/:yearMonth`
+Claude Sonnet API を呼び出して指定月の予実データを AI 分析し、結果を `budget_analyses` テーブルに保存する。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**リクエスト**: ボディなし
+
+**処理フロー**:
+1. 指定月の予算計画（`budget_plans`）・収入（`budget_income`）・実績（`budget_actuals`）を取得
+2. カテゴリ別に集計したデータをプロンプトに組み込み、Claude Sonnet API へ送信
+3. 分析結果を JSON にパースして `budget_analyses` テーブルに UPSERT 保存
+4. 保存した結果をレスポンスとして返す
+
+**レスポンス**: `200`
+```json
+{
+  "year_month": "2026-03",
+  "result": {
+    "overall_score": 78,
+    "grade": "B",
+    "summary": "全体的に良好な予算管理ができています...",
+    "categories": [
+      {
+        "name": "食費",
+        "score": 65,
+        "grade": "C",
+        "comment": "予算超過が目立ちます。外食の頻度を見直しましょう",
+        "top_expenses": ["スーパーA: 25,000円", "レストランB: 12,000円"]
+      }
+    ],
+    "insights": ["固定費の割合が収入の45%を占めています", "..."],
+    "saving_tips": ["食費を月1万円削減するとX万円貯蓄できます", "..."]
+  },
+  "created_at": "2026-04-01 12:00:00"
+}
+```
+
+**エラー**:
+- `500` — ANTHROPIC_API_KEY 未設定、または Claude API 呼び出し失敗
+
+**環境変数**: `ANTHROPIC_API_KEY`（`.env.local` またはCloud Run環境変数で設定）
 
 ---
 

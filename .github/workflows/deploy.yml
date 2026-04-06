@@ -46,4 +46,4 @@ jobs:
             --region=${{ vars.GCP_REGION }} \
             --project=${{ vars.GCP_PROJECT_ID }} \
             --image="$IMAGE_NAME:${{ github.sha }}" \
-            --update-env-vars="AUTH_PASSWORD=${{ secrets.AUTH_PASSWORD }}"
+            --update-env-vars="AUTH_PASSWORD=${{ secrets.AUTH_PASSWORD }},ANTHROPIC_API_KEY=${{ secrets.TECHO_APP }}"

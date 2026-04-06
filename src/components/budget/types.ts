@@ -67,6 +67,28 @@ export interface WishMonthPlan {
   price: number | null
 }
 
+export interface BudgetAnalysis {
+  overview: {
+    score: number
+    grade: string
+    summary: string
+  }
+  categories: {
+    name: string
+    status: 'good' | 'warning' | 'over'
+    analysis: string
+    top_expenses: string[]
+    trend: 'up' | 'down' | 'stable'
+    trend_detail: string
+  }[]
+  insights: {
+    type: 'warning' | 'positive' | 'tip'
+    title: string
+    detail: string
+  }[]
+  savings_tips: string[]
+}
+
 export const POINT_TYPES = {
   jcb_jpoint: {
     label: 'JCB J-POINT',

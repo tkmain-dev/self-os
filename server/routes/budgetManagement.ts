@@ -1,7 +1,16 @@
 import { Router } from 'express';
+import Anthropic from '@anthropic-ai/sdk';
 import db from '../db';
 
 const router = Router();
+
+// Claude API client (lazy init)
+let anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return anthropic;
+}
 
 // ── Categories & Subcategories ──
 
@@ -120,20 +129,27 @@ router.post('/plans/:yearMonth/copy-previous', (req, res) => {
   const prevDate = new Date(y, m - 2, 1);
   const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
-  const existing = db.prepare('SELECT COUNT(*) as c FROM budget_plans WHERE year_month = ?').get(ym) as { c: number };
-  if (existing.c > 0) {
-    res.json({ copied: 0, message: 'Plans already exist for this month' });
-    return;
-  }
+  const prevPlans = db.prepare(
+    'SELECT subcategory_id, amount, is_recurring, formula FROM budget_plans WHERE year_month = ? AND is_recurring = 1'
+  ).all(prevYm) as { subcategory_id: number; amount: number; is_recurring: number; formula: string | null }[];
 
-  const result = db.prepare(`
+  const upsert = db.prepare(`
     INSERT INTO budget_plans (year_month, subcategory_id, amount, is_recurring, formula)
-    SELECT ?, subcategory_id, amount, is_recurring, formula
-    FROM budget_plans
-    WHERE year_month = ? AND is_recurring = 1
-  `).run(ym, prevYm);
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(year_month, subcategory_id) DO UPDATE SET
+      amount = excluded.amount,
+      is_recurring = excluded.is_recurring,
+      formula = excluded.formula
+  `);
 
-  res.json({ copied: result.changes });
+  const tx = db.transaction(() => {
+    for (const p of prevPlans) {
+      upsert.run(ym, p.subcategory_id, p.amount, p.is_recurring, p.formula);
+    }
+  });
+  tx();
+
+  res.json({ copied: prevPlans.length });
 });
 
 // ── Income ──
@@ -166,19 +182,17 @@ router.post('/income/:yearMonth/copy-previous', (req, res) => {
   const prevDate = new Date(y, m - 2, 1);
   const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
-  const existing = db.prepare('SELECT * FROM budget_income WHERE year_month = ?').get(ym);
-  if (existing) {
-    res.json({ copied: false, message: 'Income already exists for this month' });
-    return;
-  }
-
   const prev = db.prepare('SELECT * FROM budget_income WHERE year_month = ? AND is_recurring = 1').get(prevYm) as { amount: number; is_recurring: number; savings_target: number } | undefined;
   if (!prev) {
     res.json({ copied: false });
     return;
   }
 
-  db.prepare('INSERT INTO budget_income (year_month, amount, is_recurring, savings_target) VALUES (?, ?, ?, ?)').run(ym, prev.amount, prev.is_recurring, prev.savings_target ?? 0);
+  db.prepare(`
+    INSERT INTO budget_income (year_month, amount, is_recurring, savings_target)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(year_month) DO UPDATE SET amount = excluded.amount, is_recurring = excluded.is_recurring, savings_target = excluded.savings_target
+  `).run(ym, prev.amount, prev.is_recurring, prev.savings_target ?? 0);
   res.json({ copied: true });
 });
 
@@ -352,6 +366,188 @@ router.post('/wish-plans/:yearMonth', (req, res) => {
 router.delete('/wish-plans/:yearMonth/:wishItemId', (req, res) => {
   db.prepare('DELETE FROM wish_month_plans WHERE year_month = ? AND wish_item_id = ?').run(req.params.yearMonth, req.params.wishItemId);
   res.json({ ok: true });
+});
+
+// ── AI Analysis ──
+
+function getYearMonth(ym: string, offset: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + offset, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function collectMonthData(ym: string, includeDetails = false) {
+  const plans = db.prepare(`
+    SELECT bp.amount, bs.name as sub_name, bc.name as cat_name, bc.type as cat_type
+    FROM budget_plans bp
+    JOIN budget_subcategories bs ON bp.subcategory_id = bs.id
+    JOIN budget_categories bc ON bs.category_id = bc.id
+    WHERE bp.year_month = ?
+  `).all(ym) as { amount: number; sub_name: string; cat_name: string; cat_type: string }[];
+
+  const actuals = db.prepare(`
+    SELECT category_name, SUM(amount) as total
+    FROM budget_actuals WHERE year_month = ?
+    GROUP BY category_name
+  `).all(ym) as { category_name: string; total: number }[];
+
+  // Individual transactions for detailed analysis
+  const transactions = includeDetails ? db.prepare(`
+    SELECT category_name, subcategory_name, date, description, amount
+    FROM budget_actuals WHERE year_month = ?
+    ORDER BY category_name, date
+  `).all(ym) as { category_name: string; subcategory_name: string; date: string; description: string; amount: number }[] : [];
+
+  const income = db.prepare('SELECT * FROM budget_income WHERE year_month = ?').get(ym) as {
+    amount: number; savings_target: number;
+  } | undefined;
+
+  return { plans, actuals, transactions, income: income ?? { amount: 0, savings_target: 0 } };
+}
+
+// GET cached analysis
+router.get('/analysis/:yearMonth', (req, res) => {
+  const row = db.prepare('SELECT * FROM budget_analyses WHERE year_month = ?').get(req.params.yearMonth) as {
+    result: string; created_at: string;
+  } | undefined;
+  if (!row) { res.json(null); return; }
+  res.json({ ...JSON.parse(row.result), created_at: row.created_at });
+});
+
+// POST run analysis (and cache)
+router.post('/analysis/:yearMonth', async (req, res) => {
+  const client = getAnthropic();
+  if (!client) {
+    res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' });
+    return;
+  }
+
+  const ym = req.params.yearMonth;
+  const current = collectMonthData(ym, true); // with transaction details
+  const prev1 = collectMonthData(getYearMonth(ym, -1));
+  const prev2 = collectMonthData(getYearMonth(ym, -2));
+
+  // Build plan summary by category
+  const buildPlanSummary = (data: ReturnType<typeof collectMonthData>) => {
+    const byCat = new Map<string, { budget: number; type: string; subs: { name: string; amount: number }[] }>();
+    for (const p of data.plans) {
+      const cat = byCat.get(p.cat_name) ?? { budget: 0, type: p.cat_type, subs: [] };
+      cat.budget += p.amount;
+      cat.subs.push({ name: p.sub_name, amount: p.amount });
+      byCat.set(p.cat_name, cat);
+    }
+    const actualMap = new Map(data.actuals.map(a => [a.category_name, a.total]));
+    return [...byCat.entries()].map(([name, cat]) => ({
+      category: name,
+      type: cat.type,
+      budget: cat.budget,
+      actual: Math.abs(actualMap.get(name) ?? 0),
+      diff: cat.budget - Math.abs(actualMap.get(name) ?? 0),
+      subcategories: cat.subs,
+    }));
+  };
+
+  const currentSummary = buildPlanSummary(current);
+  const prev1Summary = buildPlanSummary(prev1);
+  const prev2Summary = buildPlanSummary(prev2);
+
+  const totalBudget = current.plans.reduce((s, p) => s + p.amount, 0);
+  const totalActual = current.actuals.filter(a => a.category_name !== '収入').reduce((s, a) => s + Math.abs(a.total), 0);
+
+  // Build transaction details grouped by category
+  const txByCategory = new Map<string, { subcategory: string; date: string; description: string; amount: number }[]>();
+  for (const tx of current.transactions) {
+    if (tx.category_name === '収入' || tx.category_name === '現金・カード') continue;
+    const list = txByCategory.get(tx.category_name) ?? [];
+    list.push({ subcategory: tx.subcategory_name, date: tx.date, description: tx.description, amount: tx.amount });
+    txByCategory.set(tx.category_name, list);
+  }
+
+  const txSection = [...txByCategory.entries()].map(([cat, txs]) => {
+    return `【${cat}】\n${txs.map(t => `  ${t.date} ${t.description} ¥${Math.abs(t.amount).toLocaleString()} (${t.subcategory})`).join('\n')}`;
+  }).join('\n\n');
+
+  const prompt = `あなたは個人の家計管理の専門アドバイザーです。以下の予算・実績データとCSV明細を詳細に分析し、JSONで構造化された分析結果を返してください。
+
+重要: カテゴリごとに「なぜその金額になったか」をCSV明細から具体的に読み取り、超過・節約の原因を特定してください。
+
+## データ（${ym}月度、15日締め）
+
+### 収入・貯金
+- 収入予算: ¥${current.income.amount.toLocaleString()}
+- 貯金目標: ¥${current.income.savings_target.toLocaleString()}
+- 支出予算合計: ¥${totalBudget.toLocaleString()}
+- 支出実績合計: ¥${totalActual.toLocaleString()}
+
+### カテゴリ別予実（当月）
+${currentSummary.map(c => `- ${c.category}(${c.type === 'fixed' ? '固定' : '変動'}): 予算¥${c.budget.toLocaleString()} / 実績¥${c.actual.toLocaleString()} / 差異¥${c.diff.toLocaleString()}\n  内訳: ${c.subcategories.map(s => `${s.name}=¥${s.amount.toLocaleString()}`).join(', ')}`).join('\n')}
+
+### CSV明細（当月の全取引）
+${txSection || '（明細データなし）'}
+
+### 前月カテゴリ別
+${prev1Summary.map(c => `- ${c.category}: 予算¥${c.budget.toLocaleString()} / 実績¥${c.actual.toLocaleString()}`).join('\n') || '（データなし）'}
+
+### 前々月カテゴリ別
+${prev2Summary.map(c => `- ${c.category}: 予算¥${c.budget.toLocaleString()} / 実績¥${c.actual.toLocaleString()}`).join('\n') || '（データなし）'}
+
+## 回答形式
+以下のJSON形式で回答してください。JSONのみ返し、他のテキストは含めないでください。
+
+{
+  "overview": {
+    "score": 0-100の数値（予算管理の総合スコア）,
+    "grade": "A"〜"F"の評価,
+    "summary": "2-3文の総評。具体的な数字を含めること"
+  },
+  "categories": [
+    {
+      "name": "カテゴリ名のみ（例: '食費'）。'(固定)'や'(変動)'は付けないこと",
+      "status": "good" | "warning" | "over",
+      "analysis": "CSV明細を根拠にした2-3文の詳細分析。具体的にどの支出が原因で超過/節約になったかを明記。例: 『外食が8回で¥12,000を占め、予算の60%を消費。特に3/20の飲み会¥5,000が大きい』",
+      "top_expenses": ["金額が大きい支出TOP3を「内容 ¥金額」形式で"],
+      "trend": "up" | "down" | "stable",
+      "trend_detail": "前月・前々月と比較した具体的なトレンド説明"
+    }
+  ],
+  "insights": [
+    {
+      "type": "warning" | "positive" | "tip",
+      "title": "具体的な見出し",
+      "detail": "CSV明細に基づく詳細な説明。抽象的でなく、具体的な支出項目や金額に言及すること"
+    }
+  ],
+  "savings_tips": [
+    "CSV明細の具体的な支出パターンに基づく、実行可能な節約提案。金額の目安も含める"
+  ]
+}`;
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      res.status(500).json({ error: 'Failed to parse analysis' });
+      return;
+    }
+    const analysis = JSON.parse(jsonMatch[0]);
+    // Cache result
+    db.prepare(`
+      INSERT INTO budget_analyses (year_month, result)
+      VALUES (?, ?)
+      ON CONFLICT(year_month) DO UPDATE SET result = excluded.result, created_at = datetime('now', 'localtime')
+    `).run(ym, JSON.stringify(analysis));
+    res.json(analysis);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({ error: `Analysis failed: ${msg}` });
+  }
 });
 
 export default router;

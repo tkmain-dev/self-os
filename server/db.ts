@@ -289,6 +289,13 @@ db.exec(`
     FOREIGN KEY (wish_item_id) REFERENCES wish_items(id) ON DELETE CASCADE,
     UNIQUE(year_month, wish_item_id)
   );
+
+  CREATE TABLE IF NOT EXISTS budget_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL UNIQUE,
+    result TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 export default db;

@@ -193,6 +193,13 @@ erDiagram
     KPT_CATEGORIES ||--o{ KPT_ENTRIES : "has"
     KPT_ENTRIES ||--o{ KPT_ENTRIES : "carried_from_id"
     WISH_ITEMS ||--o{ WISH_MONTH_PLANS : "has"
+
+    BUDGET_ANALYSES {
+        int id PK
+        string year_month UK
+        string result
+        string created_at
+    }
 ```
 
 ## テーブル定義
@@ -449,3 +456,16 @@ erDiagram
 
 - **現在の利用状況**: テーブルは作成済みだが現時点では未使用。将来的な月度購入計画機能で使用予定
 - ウィッシュアイテムが削除された場合は CASCADE 削除
+
+### budget_analyses（AI分析キャッシュ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| year_month | TEXT | NOT NULL, UNIQUE | 年月（YYYY-MM） |
+| result | TEXT | NOT NULL | AI分析結果（JSON文字列） |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 分析実行日時 |
+
+- 月ごとに1レコード（UPSERT で管理）
+- `result` は Claude Sonnet API の分析結果を JSON 文字列で保存。スコアリング・カテゴリ別コメント・インサイト・節約提案を含む
+- 同一月を再分析した場合は上書き保存される
