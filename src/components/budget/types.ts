@@ -30,6 +30,7 @@ export interface BudgetIncome {
   year_month: string
   amount: number
   is_recurring: number
+  savings_target: number
 }
 
 export interface BudgetActual {

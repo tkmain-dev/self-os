@@ -7,12 +7,42 @@ function fmt(v: number): string {
   return `-¥${Math.abs(v).toLocaleString()}`
 }
 
+function splitCsvLine(line: string): string[] {
+  const cols: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else if (ch === '"') {
+        inQuotes = false
+      } else {
+        current += ch
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true
+      } else if (ch === ',') {
+        cols.push(current)
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+  }
+  cols.push(current)
+  return cols
+}
+
 function parseCsv(text: string) {
   const lines = text.split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
 
   // Handle BOM
-  const header = lines[0].replace(/^\uFEFF/, '').split(',')
+  const header = splitCsvLine(lines[0].replace(/^\uFEFF/, ''))
   const calcIdx = header.indexOf('計算対象')
   const dateIdx = header.indexOf('日付')
   const descIdx = header.indexOf('内容')
@@ -27,7 +57,7 @@ function parseCsv(text: string) {
   if (calcIdx < 0 || dateIdx < 0 || amountIdx < 0) return []
 
   return lines.slice(1).map(line => {
-    const cols = line.split(',')
+    const cols = splitCsvLine(line)
     return {
       calc: cols[calcIdx] || '',
       date: cols[dateIdx] || '',
@@ -111,6 +141,15 @@ export default function CsvImportTab({ yearMonth }: { yearMonth: string }) {
               className="hidden"
             />
           </label>
+
+          {actuals && actuals.length > 0 && (
+            <button
+              onClick={handleClear}
+              className="mt-3 w-full px-4 py-2 rounded-lg text-sm bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+            >
+              取込済みデータを全削除（{actuals.length}件）
+            </button>
+          )}
 
           {result && (
             <div className={`mt-3 px-4 py-2 rounded-lg text-sm ${

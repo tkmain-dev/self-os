@@ -129,6 +129,7 @@ erDiagram
         string year_month UK
         int amount
         int is_recurring
+        int savings_target
     }
 
     BUDGET_ACTUALS {
@@ -353,6 +354,7 @@ erDiagram
 | year_month | TEXT | NOT NULL, UNIQUE | 年月（YYYY-MM） |
 | amount | INTEGER | NOT NULL, DEFAULT 0 | 収入金額 |
 | is_recurring | INTEGER | NOT NULL, DEFAULT 1 | 毎月繰越フラグ |
+| savings_target | INTEGER | NULL, DEFAULT NULL | 貯金目標額（設定した場合、予実比較タブで余剰予算の計算に使用） |
 
 ### budget_actuals（予算実績）
 

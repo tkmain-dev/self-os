@@ -483,7 +483,9 @@ JCB実請求  = jcb_billing - jcb_skip
 ### PUT `/api/budget-mgmt/income/:yearMonth`
 指定月の収入を保存（UPSERT）。
 
-**リクエスト**: `{ "amount": 300000, "is_recurring": 1 }`
+**リクエスト**: `{ "amount": 300000, "is_recurring": 1, "savings_target": 50000 }`
+
+- `savings_target`: 貯金目標額（省略時は null。予実比較タブで余剰予算の計算に使用）
 
 ### POST `/api/budget-mgmt/income/:yearMonth/copy-previous`
 前月の繰越対象収入を当月にコピー。
@@ -498,6 +500,11 @@ JCB実請求  = jcb_billing - jcb_skip
 CSV データから実績を一括取込。`csv_id` で重複排除。
 
 **集計期間ルール（15日締め）**: CSV の日付から `year_month` を自動判定。日 >= 15 → その月の期間、日 < 15 → 前月の期間。例: 3/1 の取引 → `2026-02`（2月度）、3/15 の取引 → `2026-03`（3月度）。
+
+**パーサー仕様**:
+- ダブルクォート囲み（RFC 4180 準拠）に対応。クォート内のカンマ・改行も正しく処理
+- `category_name` が「未分類」のレコードは自動スキップ（取込対象外）
+- リクエストボディの上限: 10MB（大容量CSVに対応）
 
 ### DELETE `/api/budget-mgmt/actuals/:yearMonth`
 指定月の実績を全削除。

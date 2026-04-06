@@ -355,6 +355,7 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
 
   const [incomeRaw, setIncomeRaw] = useState('')
   const [incomeRecurring, setIncomeRecurring] = useState(1)
+  const [savingsRaw, setSavingsRaw] = useState('')
   const [addingTo, setAddingTo] = useState<number | null>(null)
   const [newSubName, setNewSubName] = useState('')
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set())
@@ -363,6 +364,7 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     if (income) {
       setIncomeRaw(income.amount ? String(income.amount) : '')
       setIncomeRecurring(income.is_recurring)
+      setSavingsRaw(income.savings_target ? String(income.savings_target) : '')
     }
   }, [income])
 
@@ -380,9 +382,11 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     const trimmed = incomeRaw.replace(/,/g, '').trim()
     const amount = trimmed ? parseInt(trimmed, 10) : 0
     if (isNaN(amount)) return
-    await apiPut(`/api/budget-mgmt/income/${yearMonth}`, { amount, is_recurring: incomeRecurring })
+    const savingsTrimmed = savingsRaw.replace(/,/g, '').trim()
+    const savingsTarget = savingsTrimmed ? parseInt(savingsTrimmed, 10) : 0
+    await apiPut(`/api/budget-mgmt/income/${yearMonth}`, { amount, is_recurring: incomeRecurring, savings_target: isNaN(savingsTarget) ? 0 : savingsTarget })
     refetchIncome()
-  }, [yearMonth, incomeRaw, incomeRecurring, refetchIncome])
+  }, [yearMonth, incomeRaw, savingsRaw, incomeRecurring, refetchIncome])
 
   const copyPrevious = async () => {
     await apiPost(`/api/budget-mgmt/plans/${yearMonth}/copy-previous`, {})
@@ -459,10 +463,20 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
             <span className="text-sm text-[#8b8b9e]">支出予算合計</span>
             <span className="text-sm font-mono text-[#e4e4ec]">{fmt(totalBudget)}</span>
           </div>
-          <div className="flex items-center justify-between py-2">
+          <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
             <span className="text-sm text-[#8b8b9e]">貯金可能額</span>
             <span className={`text-sm font-mono font-bold ${savingsTarget >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-              {savingsTarget >= 0 ? '+' : '-'}{fmt(savingsTarget)}
+              {fmt(savingsTarget)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+            <span className="text-sm text-[#8b8b9e]">貯金額</span>
+            <span className="text-sm font-mono text-[#e4e4ec]">{fmt(income?.savings_target ?? 0)}</span>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm font-semibold text-[#e4e4ec]">余剰予算</span>
+            <span className={`text-sm font-mono font-bold ${(savingsTarget - (income?.savings_target ?? 0)) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+              {fmt(savingsTarget - (income?.savings_target ?? 0))}
             </span>
           </div>
         </div>
@@ -497,6 +511,21 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
                 onBlur={saveIncome}
                 placeholder="0"
                 className="w-28 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pl-5 pr-2 py-1 text-sm text-right text-white placeholder-[#3a3a4a] focus:border-emerald-500/50 focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 py-2.5 border-t border-[#1e1e2a]">
+            <span className="text-sm text-[#8b8b9e] flex-1">貯金額</span>
+            <div className="relative shrink-0">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#5a5a6e]">¥</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={savingsRaw}
+                onChange={e => setSavingsRaw(e.target.value)}
+                onBlur={saveIncome}
+                placeholder="0"
+                className="w-28 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pl-5 pr-2 py-1 text-sm text-right text-white placeholder-[#3a3a4a] focus:border-amber-500/50 focus:outline-none transition-colors"
               />
             </div>
           </div>

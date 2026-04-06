@@ -268,5 +268,6 @@ try { db.exec(`ALTER TABLE wish_items ADD COLUMN done_at TEXT`) } catch { /* alr
 try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_date TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_label TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE budget_plans ADD COLUMN formula TEXT`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE budget_income ADD COLUMN savings_target INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
 
 export default db;

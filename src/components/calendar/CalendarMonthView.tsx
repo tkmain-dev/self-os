@@ -131,10 +131,10 @@ export default function CalendarMonthView({
 
         return (
           <div key={weekIdx} className="border-b border-[#2a2a3a] last:border-b-0">
-            {/* Nested goal bands overlay area */}
+            {/* Nested goal bands overlay area (hidden on mobile) */}
             {bandsHeight > 0 && (
               <div
-                className="relative pointer-events-none"
+                className="relative pointer-events-none hidden md:block"
                 style={{ height: `${bandsHeight}px` }}
               >
                 {bands.map((seg) => (

@@ -92,7 +92,8 @@ export default function CalendarWeekView({
     })
   }
 
-  const hasAllDay = bandsHeight > 0 || allDaySchedules.length > 0
+  const hasAllDaySchedules = allDaySchedules.length > 0
+  const hasAllDay = bandsHeight > 0 || hasAllDaySchedules
 
   return (
     <div className="overflow-x-auto -mx-1 px-1">
@@ -104,20 +105,22 @@ export default function CalendarWeekView({
             <div className="shrink-0 w-12 text-[10px] text-[#5a5a6e] pt-1 text-right pr-1">
               終日
             </div>
-            <div className="flex-1 relative" style={{ minHeight: `${Math.max(24, bandsHeight + (allDaySchedules.length > 0 ? 24 : 0) + 4)}px` }}>
-              {/* Nested goal bands */}
-              {bands.map((seg) => (
-                <BandRenderer
-                  key={`band-${seg.id}`}
-                  segment={seg}
-                  onEventClick={handleGoalClick}
-                />
-              ))}
+            <div className="flex-1 relative" style={{ minHeight: `${Math.max(24, bandsHeight + (hasAllDaySchedules ? 24 : 0) + 4)}px` }}>
+              {/* Nested goal bands (hidden on mobile) */}
+              <div className="hidden md:block">
+                {bands.map((seg) => (
+                  <BandRenderer
+                    key={`band-${seg.id}`}
+                    segment={seg}
+                    onEventClick={handleGoalClick}
+                  />
+                ))}
+              </div>
 
               {/* All-day schedules */}
-              {allDaySchedules.length > 0 && (
+              {hasAllDaySchedules && (
                 <div
-                  className="absolute flex flex-wrap gap-1 px-1"
+                  className="absolute flex flex-wrap gap-1 px-1 md:top-auto"
                   style={{ top: `${bandsHeight + 2}px` }}
                 >
                   {allDaySchedules.map((event) => {

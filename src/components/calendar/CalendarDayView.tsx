@@ -28,7 +28,8 @@ export default function CalendarDayView({ date, events, goals, routines, onSlotC
   const goalTree = useMemo(() => buildGoalTree(dayGoals), [dayGoals])
   const leaves = useMemo(() => collectLeaves(goalTree), [goalTree])
 
-  const hasAllDay = leaves.length > 0 || allDaySchedules.length > 0
+  const hasAllDaySchedules = allDaySchedules.length > 0
+  const hasAllDay = leaves.length > 0 || hasAllDaySchedules
   const columns = [{ date, isToday: date === formatDate(new Date()) }]
 
   const handleGoalClick = (goal: GoalItem) => {
@@ -45,6 +46,8 @@ export default function CalendarDayView({ date, events, goals, routines, onSlotC
       {/* All-day area: nested goal tree + untimed schedules */}
       {hasAllDay && (
         <div className="bg-[#1e1e2a] border-b border-[#2a2a3a] px-4 py-2 space-y-1">
+          {/* Goal leaves (hidden on mobile) */}
+          <div className="hidden md:block space-y-1">
           {leaves.map(({ node, epicTitle, storyTitle }) => {
             const g = node.goal
             const style = LEAF_STYLES[g.issue_type] ?? LEAF_STYLES.task
@@ -64,9 +67,10 @@ export default function CalendarDayView({ date, events, goals, routines, onSlotC
               </div>
             )
           })}
+          </div>
 
-          {allDaySchedules.length > 0 && (
-            <div className={`flex flex-col gap-1 ${leaves.length > 0 ? 'mt-1' : ''}`}>
+          {hasAllDaySchedules && (
+            <div className={`flex flex-col gap-1 ${leaves.length > 0 ? 'md:mt-1' : ''}`}>
               {allDaySchedules.map(ev => (
                 <button
                   key={`allday-${ev.id}`}

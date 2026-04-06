@@ -68,8 +68,11 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
     .filter(a => a.category_name !== '収入')
     .reduce((sum, a) => sum + a.total, 0)
 
+  const savingsTarget = income?.savings_target ?? 0
   const savingsBudget = incomeAmount - totalBudget
   const savingsActual = (actualIncome || incomeAmount) + totalActual // totalActual is negative
+  const surplusBudget = savingsBudget - savingsTarget
+  const surplusActual = savingsActual - savingsTarget
 
   // Remove income from comparison rows
   allCatNames.delete('収入')
@@ -188,17 +191,41 @@ export default function ComparisonTab({ yearMonth }: { yearMonth: string }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between py-2.5">
-            <span className="text-sm font-semibold text-[#e4e4ec]">貯金可能額</span>
+          <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+            <span className="text-sm text-[#8b8b9e]">貯金可能額</span>
             <div className="flex items-center gap-3">
-              <span className={`text-sm font-mono font-bold w-20 text-right ${savingsBudget >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+              <span className={`text-xs font-mono w-20 text-right ${savingsBudget >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
                 {fmt(savingsBudget)}
               </span>
-              <span className={`text-sm font-mono font-bold w-20 text-right ${savingsActual >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+              <span className={`text-xs font-mono w-20 text-right ${savingsActual >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
                 {fmt(savingsActual)}
               </span>
               <div className="w-20 text-right">
                 <DiffBadge diff={savingsActual - savingsBudget} />
+              </div>
+            </div>
+          </div>
+          {savingsTarget > 0 && (
+            <div className="flex items-center justify-between py-2 border-b border-[#1e1e2a]">
+              <span className="text-sm text-[#8b8b9e]">貯金額</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-[#e4e4ec] w-20 text-right">{fmt(savingsTarget)}</span>
+                <span className="text-xs font-mono text-[#e4e4ec] w-20 text-right">{fmt(savingsTarget)}</span>
+                <div className="w-20" />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-2.5">
+            <span className="text-sm font-semibold text-[#e4e4ec]">余剰予算</span>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-mono font-bold w-20 text-right ${surplusBudget >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                {fmt(surplusBudget)}
+              </span>
+              <span className={`text-sm font-mono font-bold w-20 text-right ${surplusActual >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                {fmt(surplusActual)}
+              </span>
+              <div className="w-20 text-right">
+                <DiffBadge diff={surplusActual - surplusBudget} />
               </div>
             </div>
           </div>

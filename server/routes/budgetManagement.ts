@@ -141,19 +141,19 @@ router.post('/plans/:yearMonth/copy-previous', (req, res) => {
 // GET /api/budget-mgmt/income/:yearMonth
 router.get('/income/:yearMonth', (req, res) => {
   const income = db.prepare('SELECT * FROM budget_income WHERE year_month = ?').get(req.params.yearMonth);
-  res.json(income ?? { year_month: req.params.yearMonth, amount: 0, is_recurring: 1 });
+  res.json(income ?? { year_month: req.params.yearMonth, amount: 0, is_recurring: 1, savings_target: 0 });
 });
 
 // PUT /api/budget-mgmt/income/:yearMonth
 router.put('/income/:yearMonth', (req, res) => {
   const ym = req.params.yearMonth;
-  const { amount, is_recurring } = req.body;
+  const { amount, is_recurring, savings_target } = req.body;
 
   db.prepare(`
-    INSERT INTO budget_income (year_month, amount, is_recurring)
-    VALUES (?, ?, ?)
-    ON CONFLICT(year_month) DO UPDATE SET amount = excluded.amount, is_recurring = excluded.is_recurring
-  `).run(ym, amount ?? 0, is_recurring ?? 1);
+    INSERT INTO budget_income (year_month, amount, is_recurring, savings_target)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(year_month) DO UPDATE SET amount = excluded.amount, is_recurring = excluded.is_recurring, savings_target = excluded.savings_target
+  `).run(ym, amount ?? 0, is_recurring ?? 1, savings_target ?? 0);
 
   const income = db.prepare('SELECT * FROM budget_income WHERE year_month = ?').get(ym);
   res.json(income);
@@ -172,13 +172,13 @@ router.post('/income/:yearMonth/copy-previous', (req, res) => {
     return;
   }
 
-  const prev = db.prepare('SELECT * FROM budget_income WHERE year_month = ? AND is_recurring = 1').get(prevYm) as { amount: number; is_recurring: number } | undefined;
+  const prev = db.prepare('SELECT * FROM budget_income WHERE year_month = ? AND is_recurring = 1').get(prevYm) as { amount: number; is_recurring: number; savings_target: number } | undefined;
   if (!prev) {
     res.json({ copied: false });
     return;
   }
 
-  db.prepare('INSERT INTO budget_income (year_month, amount, is_recurring) VALUES (?, ?, ?)').run(ym, prev.amount, prev.is_recurring);
+  db.prepare('INSERT INTO budget_income (year_month, amount, is_recurring, savings_target) VALUES (?, ?, ?, ?)').run(ym, prev.amount, prev.is_recurring, prev.savings_target ?? 0);
   res.json({ copied: true });
 });
 
@@ -236,8 +236,9 @@ router.post('/actuals/import', (req, res) => {
 
   const tx = db.transaction(() => {
     for (const row of rows) {
-      // Only import rows with 計算対象=1
+      // Only import rows with 計算対象=1, skip 未分類
       if (row.calc !== '1') { skipped++; continue; }
+      if (row.category === '未分類') { skipped++; continue; }
 
       // Convert date: 2026/03/01 → year_month using 15th-closing rule
       // day >= 15 → that month's period; day < 15 → previous month's period

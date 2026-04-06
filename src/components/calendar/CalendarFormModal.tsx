@@ -284,7 +284,7 @@ export default function CalendarFormModal({ mode: initialMode, editItem, prefill
               </div>
 
               {/* Type / Status / Priority */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelClass}>タイプ</label>
                   <select value={issueType} onChange={e => setIssueType(e.target.value)} className={selectClass}>
