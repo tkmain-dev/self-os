@@ -22,6 +22,7 @@
 | 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
 | 家計簿 | `/api/budget` | `server/routes/budget.ts` |
 | 予算管理 | `/api/budget-mgmt` | `server/routes/budgetManagement.ts` |
+| KPT | `/api/kpt` | `server/routes/kpt.ts` |
 
 ---
 
@@ -500,6 +501,98 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 
 ### DELETE `/api/budget-mgmt/actuals/:yearMonth`
 指定月の実績を全削除。
+
+---
+
+## KPT API (`/api/kpt`)
+
+### GET `/api/kpt/categories`
+全カテゴリを取得。ソート: `sort_order ASC, id ASC`
+
+**レスポンス**: `200`
+```json
+[{ "id": 1, "name": "開発プロセス", "sort_order": 0, "created_at": "..." }]
+```
+
+### POST `/api/kpt/categories`
+カテゴリを作成。
+
+**リクエスト**: `{ "name": "カテゴリ名" }`
+**レスポンス**: `200`
+
+### PATCH `/api/kpt/categories/:id`
+カテゴリを更新。`name`, `sort_order` を部分更新可能。
+
+### DELETE `/api/kpt/categories/:id`
+カテゴリを削除（関連エントリも CASCADE 削除）。
+
+### GET `/api/kpt/entries?year_week=YYYY-Wnn`
+指定週のエントリを取得。`carried_from_type`（引き継ぎ元の種別）を JOIN で返す。
+
+**レスポンス**: `200`
+```json
+[{
+  "id": 1,
+  "category_id": 1,
+  "year_week": "2026-W14",
+  "type": "keep",
+  "content": "毎朝のコードレビュー",
+  "sort_order": 0,
+  "carried_from_id": 5,
+  "carried_from_type": "try",
+  "problem_status": null,
+  "problem_reason": null,
+  "resolved_keep": null,
+  "promoted_to_keep": 0,
+  "todo_id": null,
+  "created_at": "..."
+}]
+```
+
+### POST `/api/kpt/entries`
+エントリを作成。
+
+**リクエスト**:
+```json
+{ "category_id": 1, "year_week": "2026-W14", "type": "keep", "content": "内容", "carried_from_id": null }
+```
+
+### PATCH `/api/kpt/entries/:id`
+エントリを部分更新。`content`, `problem_status`, `problem_reason`, `resolved_keep`, `sort_order` を更新可能。
+
+**副作用**:
+- Try の `content` 更新時: 次週に Keep エントリを自動作成/同期（content が空なら削除）
+- Problem の `problem_status` 更新時: `unresolved`/`partial` → 次週に Problem を自動引き継ぎ（理由付き）。`resolved` → 引き継ぎ削除
+
+### DELETE `/api/kpt/entries/:id`
+エントリを削除。Try の場合は次週の自動作成 Keep も連動削除。
+
+### POST `/api/kpt/entries/:id/carry`
+Keep エントリを次週に引き継ぎ。
+
+**リクエスト**: `{ "target_week": "2026-W15" }`
+**レスポンス**: `200`（作成されたエントリ）/ `409`（既に引き継ぎ済み）
+
+### POST `/api/kpt/entries/:id/to-task`
+Try エントリを Todo タスクに変換。
+
+**レスポンス**: `200 { "ok": true, "todo_id": 123 }` / `409`（変換済み）
+
+### GET `/api/kpt/stats`
+改善成功率を取得。
+
+**レスポンス**: `200`
+```json
+{
+  "try_total": 10,
+  "try_promoted": 4,
+  "success_rate": 40,
+  "problem_stats": [{ "problem_status": "resolved", "c": 5 }]
+}
+```
+
+### GET `/api/kpt/prev-problems?year_week=YYYY-Wnn`
+指定週の前週の Problem エントリを取得（カテゴリ名付き）。
 
 ---
 

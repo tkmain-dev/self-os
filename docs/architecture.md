@@ -14,14 +14,14 @@
 └─────────────────┘                      └──────┬───────────┘
                                                 │
                                          ┌──────▼───────────┐
-                                         │  SQLite (WAL)    │
+                                         │  SQLite (DELETE)  │
                                          │  data/techo.db   │
                                          └──────────────────┘
 ```
 
 - **フロントエンド**: Vite 7 で React 19 + TypeScript をビルド・配信（ポート 5173）
 - **バックエンド**: Express 5 で REST API を提供（ポート 3001）
-- **DB**: SQLite をファイルベースで利用。WAL モードで高速読み書き
+- **DB**: SQLite をファイルベースで利用。DELETE モード（GCSFuse互換）
 - **プロキシ**: 開発時は Vite の proxy 設定で `/api` を Express へ転送
 
 ## 技術スタック
@@ -43,7 +43,7 @@
 
 ### データベース
 - **SQLite** — リレーショナルデータベース（ファイルベース）
-- **WAL モード** — 書き込み性能向上
+- **DELETE モード** — GCSFuse 互換（WAL は GCSFuse と非互換のため）
 - **外部キー制約** — 有効化（データ整合性保証）
 
 ## 開発サーバー
@@ -67,7 +67,8 @@ techo-app/
 │       ├── habits.ts         # 習慣 + ログ CRUD
 │       ├── goals.ts          # 目標 CRUD + 並替 + 期間伝播
 │       ├── featureRequests.ts # Feature Request CRUD + 並替
-│       └── wishItems.ts      # ウィッシュアイテム CRUD + 並替
+│       ├── wishItems.ts      # ウィッシュアイテム CRUD + 並替
+│       └── kpt.ts            # KPT カテゴリ + エントリ CRUD + 自動引き継ぎ
 ├── src/                      # フロントエンド
 │   ├── main.tsx              # React エントリポイント
 │   ├── App.tsx               # ルーティング定義
@@ -83,6 +84,7 @@ techo-app/
 │       ├── Schedule.tsx       # スケジュール表示
 │       ├── TodoList.tsx       # ToDo リスト
 │       ├── WishListPage.tsx   # ウィッシュ / バケットリスト
+│       ├── KptPage.tsx       # KPT 振り返りページ
 │       ├── admin/
 │       │   └── AdminModal.tsx # 管理モーダル (Feature Requests)
 │       └── calendar/          # カレンダー機能
@@ -96,6 +98,7 @@ techo-app/
 │           ├── CalendarEventItem.tsx
 │           ├── CalendarGoalItem.tsx
 │           ├── CalendarFormModal.tsx
+│           ├── holidays.ts
 │           ├── calendarTypes.ts
 │           └── calendarUtils.ts
 ├── data/                     # SQLite データベース (gitignore)
@@ -114,6 +117,7 @@ techo-app/
 | `/calendar` | `CalendarPage` | カレンダー（月/週/日） |
 | `/goals` | `GoalGantt` | 目標管理ガントチャート |
 | `/wishlist` | `WishListPage` | ウィッシュ / バケットリスト |
+| `/kpt` | `KptPage` | KPT 振り返り |
 
 管理モーダル（`AdminModal`）はサイドバーの歯車ボタンから開き、Feature Request を管理する。
 
@@ -129,6 +133,7 @@ techo-app/
 │ カレンダー │                              │
 │ 目標管理  │                              │
 │ ウィッシュ │                              │
+│ KPT      │                              │
 │          │                              │
 │──────────│                              │
 │ ⚙ 管理   │                              │

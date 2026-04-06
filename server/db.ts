@@ -184,7 +184,39 @@ db.exec(`
     source TEXT NOT NULL DEFAULT '',
     csv_id TEXT UNIQUE
   );
+
+  CREATE TABLE IF NOT EXISTS kpt_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  CREATE TABLE IF NOT EXISTS kpt_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    year_week TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('keep', 'problem', 'try')),
+    content TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    carried_from_id INTEGER,
+    problem_status TEXT CHECK(problem_status IN ('resolved', 'unresolved', 'partial')),
+    problem_reason TEXT,
+    promoted_to_keep INTEGER NOT NULL DEFAULT 0,
+    todo_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (category_id) REFERENCES kpt_categories(id) ON DELETE CASCADE,
+    FOREIGN KEY (carried_from_id) REFERENCES kpt_entries(id) ON DELETE SET NULL,
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE SET NULL
+  );
 `);
+
+// Migration: add resolved_keep column to kpt_entries
+try {
+  db.exec(`ALTER TABLE kpt_entries ADD COLUMN resolved_keep TEXT`);
+} catch {
+  // Column already exists
+}
 
 // Seed budget categories if empty
 const catCount = db.prepare('SELECT COUNT(*) as c FROM budget_categories').get() as { c: number };

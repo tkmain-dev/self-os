@@ -4,6 +4,7 @@ import {
   getMonthGrid, formatDate, WEEKDAY_LABELS_SHORT,
   buildGoalTree, layoutWeekBands, calcWeekBandsHeight,
 } from './calendarUtils'
+import { getHolidayName } from './holidays'
 import type { GoalItem, CalendarEvent, BandSegment } from './calendarTypes'
 
 interface CalendarMonthViewProps {
@@ -152,6 +153,7 @@ export default function CalendarMonthView({
                 const isCurrentMonth = dateStr.startsWith(monthPrefix)
                 const isToday = dateStr === today
                 const isWeekend = dayIdx === 0 || dayIdx === 6
+                const holidayName = getHolidayName(dateStr)
 
                 const daySchedules = eventsByDate.get(dateStr) ?? []
 
@@ -163,6 +165,7 @@ export default function CalendarMonthView({
                     isCurrentMonth={isCurrentMonth}
                     isToday={isToday}
                     isWeekend={isWeekend}
+                    holidayName={holidayName}
                     onClick={() => onDateClick(dateStr)}
                     onEventClick={onEventClick}
                   />

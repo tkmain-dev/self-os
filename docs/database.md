@@ -5,7 +5,7 @@
 SQLite をファイルベース（`data/techo.db`）で使用。`better-sqlite3` による同期的操作。
 起動時にテーブルが存在しなければ自動作成される。
 
-- **WAL モード**: 書き込み性能向上
+- **DELETE モード**: GCSFuse 互換（`journal_mode=DELETE`）
 - **外部キー制約**: 有効化（データ整合性保証）
 
 ## ER図
@@ -146,8 +146,33 @@ erDiagram
     HABITS ||--o{ HABIT_LOGS : "has"
     HABITS ||--o{ HABITS : "parent_id"
     GOALS ||--o{ GOALS : "parent_id"
+    KPT_CATEGORIES {
+        int id PK
+        string name
+        int sort_order
+        string created_at
+    }
+
+    KPT_ENTRIES {
+        int id PK
+        int category_id FK
+        string year_week
+        string type
+        string content
+        int sort_order
+        int carried_from_id FK
+        string problem_status
+        string problem_reason
+        string resolved_keep
+        int promoted_to_keep
+        int todo_id FK
+        string created_at
+    }
+
     BUDGET_CATEGORIES ||--o{ BUDGET_SUBCATEGORIES : "has"
     BUDGET_SUBCATEGORIES ||--o{ BUDGET_PLANS : "has"
+    KPT_CATEGORIES ||--o{ KPT_ENTRIES : "has"
+    KPT_ENTRIES ||--o{ KPT_ENTRIES : "carried_from_id"
 ```
 
 ## テーブル定義
@@ -342,3 +367,34 @@ erDiagram
 | amount | INTEGER | NOT NULL | 金額 |
 | source | TEXT | NOT NULL, DEFAULT '' | 取込元 |
 | csv_id | TEXT | UNIQUE | CSV重複防止ID |
+
+### kpt_categories（KPTカテゴリ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | カテゴリID |
+| name | TEXT | NOT NULL | カテゴリ名（テーマ） |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+
+### kpt_entries（KPTエントリ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | エントリID |
+| category_id | INTEGER | NOT NULL, FK → kpt_categories(id) ON DELETE CASCADE | カテゴリID |
+| year_week | TEXT | NOT NULL | ISO週番号（例: `2026-W14`） |
+| type | TEXT | NOT NULL, CHECK('keep','problem','try') | K/P/T 種別 |
+| content | TEXT | NOT NULL | 内容 |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
+| carried_from_id | INTEGER | NULL, FK → kpt_entries(id) ON DELETE SET NULL | 引き継ぎ元エントリID |
+| problem_status | TEXT | NULL, CHECK('resolved','unresolved','partial') | Problem の評価状態 |
+| problem_reason | TEXT | NULL | 未解決/部分解決の理由 |
+| resolved_keep | TEXT | NULL | 効果があった Keep（Problem 解決時） |
+| promoted_to_keep | INTEGER | NOT NULL, DEFAULT 0 | Keep 昇格フラグ |
+| todo_id | INTEGER | NULL, FK → todos(id) ON DELETE SET NULL | タスク変換先 |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+
+- **引き継ぎ**: `carried_from_id` で元エントリを参照。Keep の週間継続、Try→Keep 昇格、Problem の未解決引き継ぎに使用
+- **自動昇格**: Try に content を保存すると自動的に次週の Keep エントリが作成される
+- **Problem 引き継ぎ**: 未解決/部分解決と評価された Problem は自動的に次週に引き継がれる（理由付き）

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react'
 import type { CalendarEvent, RoutineItem } from './calendarTypes'
 import CalendarEventItem from './CalendarEventItem'
+import { getHolidayName } from './holidays'
 
 interface CalendarTimeGridProps {
   columns: { date: string; isToday: boolean }[]
@@ -100,6 +101,7 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
           const d = new Date(col.date + 'T00:00:00')
           const dayNames = ['日', '月', '火', '水', '木', '金', '土']
           const dow = d.getDay()
+          const holiday = getHolidayName(col.date)
           return (
             <div
               key={col.date}
@@ -107,12 +109,17 @@ export default function CalendarTimeGrid({ columns, events, routines, onSlotClic
                 col.isToday ? 'bg-amber-500/10' : ''
               }`}
             >
-              <div className={`text-[10px] ${col.isToday ? 'text-amber-400' : dow === 0 ? 'text-red-400/60' : dow === 6 ? 'text-blue-400/60' : 'text-[#5a5a6e]'}`}>
+              <div className={`text-[10px] ${col.isToday ? 'text-amber-400' : holiday || dow === 0 ? 'text-red-400/60' : dow === 6 ? 'text-blue-400/60' : 'text-[#5a5a6e]'}`}>
                 {dayNames[dow]}
               </div>
-              <div className={`text-sm font-medium ${col.isToday ? 'text-amber-400' : 'text-[#e4e4ec]'}`}>
+              <div className={`text-sm font-medium ${col.isToday ? 'text-amber-400' : holiday ? 'text-red-400' : 'text-[#e4e4ec]'}`}>
                 {d.getDate()}
               </div>
+              {holiday && (
+                <div className="text-[8px] text-red-400/60 leading-tight truncate px-1">
+                  {holiday}
+                </div>
+              )}
             </div>
           )
         })}

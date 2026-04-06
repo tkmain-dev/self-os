@@ -6,6 +6,7 @@ import CalendarPage from './components/calendar/CalendarPage'
 import GoalGantt from './components/GoalGantt'
 import WishListPage from './components/WishListPage'
 import BudgetPage from './components/BudgetPage'
+import KptPage from './components/KptPage'
 import LoginPage from './components/LoginPage'
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
         <Route path="/goals" element={<GoalGantt />} />
         <Route path="/wishlist" element={<WishListPage />} />
         <Route path="/budget" element={<BudgetPage />} />
+        <Route path="/kpt" element={<KptPage />} />
       </Routes>
     </Layout>
   )

@@ -6,6 +6,7 @@ interface CalendarDayCellProps {
   isCurrentMonth: boolean
   isToday: boolean
   isWeekend: boolean
+  holidayName: string | null
   onClick: () => void
   onEventClick: (event: CalendarEvent) => void
 }
@@ -27,29 +28,36 @@ export default function CalendarDayCell({
   isCurrentMonth,
   isToday,
   isWeekend,
+  holidayName,
   onClick,
   onEventClick,
 }: CalendarDayCellProps) {
   const dayNum = new Date(date + 'T00:00:00').getDate()
   const visibleEvents = events.slice(0, MAX_VISIBLE)
   const overflowCount = events.length - MAX_VISIBLE
+  const isHoliday = !!holidayName
 
   return (
     <div
       className={`min-h-[100px] p-1.5 border-b border-r border-[#2a2a3a] cursor-pointer hover:bg-[#1e1e2a] transition-colors ${
-        isWeekend ? 'bg-[#13131d]' : ''
+        isWeekend || isHoliday ? 'bg-[#13131d]' : ''
       } ${isToday ? 'bg-amber-500/5' : ''}`}
       onClick={onClick}
     >
-      {/* Day number */}
-      <div className="mb-1">
+      {/* Day number + holiday name */}
+      <div className="mb-1 flex items-center gap-1">
         {isToday ? (
-          <span className="w-6 h-6 flex items-center justify-center bg-amber-500 text-black rounded-full text-xs font-bold">
+          <span className="w-6 h-6 flex items-center justify-center bg-amber-500 text-black rounded-full text-xs font-bold shrink-0">
             {dayNum}
           </span>
         ) : (
-          <span className={`text-xs ${isCurrentMonth ? 'text-[#e4e4ec]' : 'text-[#5a5a6e]'}`}>
+          <span className={`text-xs ${isHoliday ? 'text-red-400' : isCurrentMonth ? 'text-[#e4e4ec]' : 'text-[#5a5a6e]'}`}>
             {dayNum}
+          </span>
+        )}
+        {holidayName && (
+          <span className="text-[9px] text-red-400/70 truncate leading-tight">
+            {holidayName}
           </span>
         )}
       </div>

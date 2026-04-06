@@ -14,6 +14,7 @@ const nav = [
   { to: '/goals', label: '目標管理', icon: '◫' },
   { to: '/wishlist', label: 'ウィッシュ', icon: '✦' },
   { to: '/budget', label: '家計簿', icon: '¥' },
+  { to: '/kpt', label: 'KPT', icon: '↻' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
