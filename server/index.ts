@@ -51,8 +51,9 @@ app.use(rateLimit({
 }));
 
 // CORS: production は自ドメインのみ、dev は localhost 許可
+// FR#54: LB廃止に伴いCloud Run直接URLに変更
 const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? ['https://35-227-242-58.sslip.io']
+  ? ['https://techo-app-qci2z4yx2q-an.a.run.app']
   : ['http://localhost:5173', 'http://localhost:3001'];
 
 app.use(cors({

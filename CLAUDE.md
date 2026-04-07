@@ -61,7 +61,7 @@
 4. 対象の Feature Request に対して以下を API PATCH で記録する:
    - `status`: `"done"`
    - `commit_message`: `"<hash> <subject>"` 形式（例: `abc1234 feat: ダイアリーチェックリスト実装`）
-   - FR API URL: `https://35-227-242-58.sslip.io/api/feature-requests/:id`（Cloud URL を使用、localhost ではない）
+   - FR API URL: `https://techo-app-qci2z4yx2q-an.a.run.app/api/feature-requests/:id`（Cloud URL を使用、localhost ではない）
    - Cloud への PATCH にはクッキー認証が必要（先にログインしてクッキーを取得する）
 
 ## プロジェクト概要
@@ -84,8 +84,8 @@ npm run lint         # ESLint
 ## Cloud / GCP
 
 - GCP Project: `techo-app-f3ece185`
-- App URL: **https://35-227-242-58.sslip.io**
-- LB IP: `35.227.242.58`
+- App URL: **https://techo-app-qci2z4yx2q-an.a.run.app** (Cloud Run direct, FR#54でLB廃止)
+- 旧 LB IP: `35.227.242.58` (FR#54で削除)
 - AR repo: `asia-northeast1-docker.pkg.dev/techo-app-f3ece185/techo-repo`
 - Cloud Run: `techo-app` (asia-northeast1), ingress=INTERNAL_LOAD_BALANCER
 - GCS bucket: `techo-app-f3ece185-sqlite` (SQLite at /data/techo.db)

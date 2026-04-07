@@ -8,14 +8,15 @@ output "region" {
   value       = var.region
 }
 
-output "lb_ip" {
-  description = "Load balancer IP address"
-  value       = google_compute_global_address.default.address
-}
+# FR#54 cost reduction: LB removed, app served directly from Cloud Run
+# output "lb_ip" {
+#   description = "Load balancer IP address"
+#   value       = google_compute_global_address.default.address
+# }
 
 output "app_url" {
-  description = "Application URL"
-  value       = "https://${local.ip_domain}"
+  description = "Application URL (Cloud Run direct)"
+  value       = google_cloud_run_v2_service.app.uri
 }
 
 output "artifact_registry_repo" {

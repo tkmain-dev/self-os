@@ -147,7 +147,9 @@ resource "google_cloud_run_v2_service" "app" {
   project  = google_project.app.project_id
   name     = "techo-app"
   location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # FR#54 cost reduction: LB廃止に伴いingressをALLに変更
+  # ロールバック時は "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" に戻す
+  ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.cloudrun.email
@@ -205,104 +207,121 @@ resource "google_cloud_run_v2_service" "app" {
 
 
 ################################################################################
-# 7. Application Load Balancer
+# 7. Application Load Balancer  [DISABLED - FR#54 cost reduction]
 ################################################################################
-
-resource "google_compute_global_address" "default" {
-  project    = google_project.app.project_id
-  name       = "techo-app-ip"
-  depends_on = [google_project_service.apis]
-}
-
-# sslip.io domain derived from the static IP (e.g. 34-1-2-3.sslip.io)
-locals {
-  ip_domain = "${replace(google_compute_global_address.default.address, ".", "-")}.sslip.io"
-}
-
-resource "google_compute_managed_ssl_certificate" "default" {
-  project = google_project.app.project_id
-  name    = "techo-app-cert"
-  managed {
-    domains = [local.ip_domain]
-  }
-}
-
-resource "google_compute_region_network_endpoint_group" "cloudrun_neg" {
-  project               = google_project.app.project_id
-  name                  = "techo-app-neg"
-  network_endpoint_type = "SERVERLESS"
-  region                = var.region
-
-  cloud_run {
-    service = google_cloud_run_v2_service.app.name
-  }
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_compute_backend_service" "default" {
-  project               = google_project.app.project_id
-  name                  = "techo-app-backend"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  protocol              = "HTTPS"
-
-  backend {
-    group = google_compute_region_network_endpoint_group.cloudrun_neg.id
-  }
-
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_compute_url_map" "default" {
-  project         = google_project.app.project_id
-  name            = "techo-app-url-map"
-  default_service = google_compute_backend_service.default.id
-}
-
-resource "google_compute_target_https_proxy" "default" {
-  project          = google_project.app.project_id
-  name             = "techo-app-https-proxy"
-  url_map          = google_compute_url_map.default.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.default.id]
-}
-
-resource "google_compute_global_forwarding_rule" "default" {
-  project               = google_project.app.project_id
-  name                  = "techo-app-forwarding-rule"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  ip_address            = google_compute_global_address.default.id
-  port_range            = "443"
-  target                = google_compute_target_https_proxy.default.id
-}
-
-# HTTP -> HTTPS redirect
-resource "google_compute_url_map" "http_redirect" {
-  project = google_project.app.project_id
-  name    = "techo-app-http-redirect"
-
-  default_url_redirect {
-    https_redirect         = true
-    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
-    strip_query            = false
-  }
-}
-
-resource "google_compute_target_http_proxy" "http_redirect" {
-  project = google_project.app.project_id
-  name    = "techo-app-http-proxy"
-  url_map = google_compute_url_map.http_redirect.id
-}
-
-resource "google_compute_global_forwarding_rule" "http_redirect" {
-  project               = google_project.app.project_id
-  name                  = "techo-app-http-forwarding"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  ip_address            = google_compute_global_address.default.id
-  port_range            = "80"
-  target                = google_compute_target_http_proxy.http_redirect.id
-}
+# 月額約¥3,500のLB固定費を削減するため、LBを廃止しCloud Run直接公開に変更。
+# ロールバック手順:
+#   1. このセクション全体（resource ブロックと locals）のコメントを外す
+#   2. 上の Cloud Run の ingress を "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" に戻す
+#   3. terraform apply を実行
+#   4. アプリのアクセスURLを Cloud Run URL → LB URL に再度変更
+#
+# 削除されたリソース（バックアップ: /tmp/techo-rollback/*.yaml）:
+#   - google_compute_global_address.default
+#   - google_compute_managed_ssl_certificate.default
+#   - google_compute_region_network_endpoint_group.cloudrun_neg
+#   - google_compute_backend_service.default
+#   - google_compute_url_map.default / .http_redirect
+#   - google_compute_target_https_proxy.default / .http_redirect
+#   - google_compute_global_forwarding_rule.default / .http_redirect
+#
+# /*
+# resource "google_compute_global_address" "default" {
+#   project    = google_project.app.project_id
+#   name       = "techo-app-ip"
+#   depends_on = [google_project_service.apis]
+# }
+#
+# # sslip.io domain derived from the static IP (e.g. 34-1-2-3.sslip.io)
+# locals {
+#   ip_domain = "${replace(google_compute_global_address.default.address, ".", "-")}.sslip.io"
+# }
+#
+# resource "google_compute_managed_ssl_certificate" "default" {
+#   project = google_project.app.project_id
+#   name    = "techo-app-cert"
+#   managed {
+#     domains = [local.ip_domain]
+#   }
+# }
+#
+# resource "google_compute_region_network_endpoint_group" "cloudrun_neg" {
+#   project               = google_project.app.project_id
+#   name                  = "techo-app-neg"
+#   network_endpoint_type = "SERVERLESS"
+#   region                = var.region
+#
+#   cloud_run {
+#     service = google_cloud_run_v2_service.app.name
+#   }
+#   depends_on = [google_project_service.apis]
+# }
+#
+# resource "google_compute_backend_service" "default" {
+#   project               = google_project.app.project_id
+#   name                  = "techo-app-backend"
+#   load_balancing_scheme = "EXTERNAL_MANAGED"
+#   protocol              = "HTTPS"
+#
+#   backend {
+#     group = google_compute_region_network_endpoint_group.cloudrun_neg.id
+#   }
+#
+#   depends_on = [google_project_service.apis]
+# }
+#
+# resource "google_compute_url_map" "default" {
+#   project         = google_project.app.project_id
+#   name            = "techo-app-url-map"
+#   default_service = google_compute_backend_service.default.id
+# }
+#
+# resource "google_compute_target_https_proxy" "default" {
+#   project          = google_project.app.project_id
+#   name             = "techo-app-https-proxy"
+#   url_map          = google_compute_url_map.default.id
+#   ssl_certificates = [google_compute_managed_ssl_certificate.default.id]
+# }
+#
+# resource "google_compute_global_forwarding_rule" "default" {
+#   project               = google_project.app.project_id
+#   name                  = "techo-app-forwarding-rule"
+#   load_balancing_scheme = "EXTERNAL_MANAGED"
+#   ip_address            = google_compute_global_address.default.id
+#   port_range            = "443"
+#   target                = google_compute_target_https_proxy.default.id
+# }
+#
+# # HTTP -> HTTPS redirect
+# resource "google_compute_url_map" "http_redirect" {
+#   project = google_project.app.project_id
+#   name    = "techo-app-http-redirect"
+#
+#   default_url_redirect {
+#     https_redirect         = true
+#     redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+#     strip_query            = false
+#   }
+# }
+#
+# resource "google_compute_target_http_proxy" "http_redirect" {
+#   project = google_project.app.project_id
+#   name    = "techo-app-http-proxy"
+#   url_map = google_compute_url_map.http_redirect.id
+# }
+#
+# resource "google_compute_global_forwarding_rule" "http_redirect" {
+#   project               = google_project.app.project_id
+#   name                  = "techo-app-http-forwarding"
+#   load_balancing_scheme = "EXTERNAL_MANAGED"
+#   ip_address            = google_compute_global_address.default.id
+#   port_range            = "80"
+#   target                = google_compute_target_http_proxy.http_redirect.id
+# }
+# */
 
 ################################################################################
-# 8. Cloud Run IAM (allow LB to invoke Cloud Run)
+# 8. Cloud Run IAM (public access)
 ################################################################################
 
 resource "google_cloud_run_v2_service_iam_member" "lb_invoker" {
