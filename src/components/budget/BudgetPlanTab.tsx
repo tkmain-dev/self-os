@@ -424,8 +424,8 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
       selected_rate_option_id: d.selected_rate_option_id,
     }))
     await apiPut(`/api/budget-mgmt/point-balances/${yearMonth}`, { balances })
-    refetchPointBalances()
-  }, [yearMonth, pointDrafts, refetchPointBalances])
+    // Don't refetch — would overwrite local draft via useEffect
+  }, [yearMonth, pointDrafts])
 
   // Point type CRUD
   const addPointType = async () => {
