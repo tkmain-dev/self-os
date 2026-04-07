@@ -22,7 +22,10 @@
 | 月の目標 | `/api/monthly-goals` | `server/routes/monthlyGoals.ts` |
 | 家計簿 | `/api/budget` | `server/routes/budget.ts` |
 | 予算管理 | `/api/budget-mgmt` | `server/routes/budgetManagement.ts` |
-| ポイント残高 | `/api/budget-mgmt/points` | `server/routes/budgetManagement.ts` |
+| ポイント残高（旧） | `/api/budget-mgmt/points` | `server/routes/budgetManagement.ts` |
+| ポイント種別 | `/api/budget-mgmt/point-types` | `server/routes/budgetManagement.ts` |
+| ポイント交換レート | `/api/budget-mgmt/rate-options` | `server/routes/budgetManagement.ts` |
+| ポイント残高 v2 | `/api/budget-mgmt/point-balances` | `server/routes/budgetManagement.ts` |
 | 月度購入計画 | `/api/budget-mgmt/wish-plans` | `server/routes/budgetManagement.ts` |
 | AI分析 | `/api/budget-mgmt/analysis` | `server/routes/budgetManagement.ts` |
 | KPT | `/api/kpt` | `server/routes/kpt.ts` |
@@ -312,7 +315,8 @@ Feature Request を削除。**レスポンス**: `204`
   "memo": "メモ",
   "done": 0,
   "sort_order": 1,
-  "created_at": "..."
+  "created_at": "...",
+  "payment_method": "cash"
 }]
 ```
 
@@ -327,15 +331,21 @@ Feature Request を削除。**レスポンス**: `204`
   "price": 300000,
   "url": "https://...",
   "deadline": "2024-12-31",
-  "memo": "メモ"
+  "memo": "メモ",
+  "payment_method": "cash"
 }
 ```
-`price`, `url`, `deadline`, `memo` はオプション。
+`price`, `url`, `deadline`, `memo` はオプション。`payment_method` はオプション（省略時は `'cash'`）。
+
+**payment_method の値**:
+- `'cash'` — 現金・デビットカード払い
+- `'loan'` — ローン・後払い（残り購入可能額の計算から除外される）
+- `'point:<id>'` — ポイント払い（`<id>` は `point_types.id`。対応するポイント残高を消費する）
 
 **レスポンス**: `201`
 
 ### PATCH `/api/wish-items/:id`
-アイテムを部分更新。`done` フラグの変更もここで行う。
+アイテムを部分更新。`done` フラグの変更・`payment_method` の変更もここで行う。
 
 ### DELETE `/api/wish-items/:id`
 アイテムを削除。**レスポンス**: `204`
@@ -515,7 +525,9 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 ---
 
 ### GET `/api/budget-mgmt/points/:yearMonth`
-指定月のポイント残高を全種別取得。
+（旧API）指定月のポイント残高を全種別取得（固定3種別: jcb / amazon / fukuri）。
+
+> 新機能ではユーザー定義ポイント種別の `/api/budget-mgmt/point-balances/:yearMonth` を使用。
 
 **パラメータ**: `yearMonth` — YYYY-MM
 
@@ -529,7 +541,7 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 ```
 
 ### PUT `/api/budget-mgmt/points/:yearMonth`
-指定月のポイント残高を一括保存（UPSERT）。送信したレコードのみ更新される。
+（旧API）指定月のポイント残高を一括保存（UPSERT）。送信したレコードのみ更新される。
 
 **リクエスト**:
 ```json
@@ -544,6 +556,116 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 - `exchange_rate`: 1ポイント = N円。円換算額はフロントエンドで `balance × exchange_rate` として計算
 
 **レスポンス**: `200`（更新後の全ポイントレコード）
+
+---
+
+### ポイント種別 API (`/api/budget-mgmt/point-types`)
+
+ユーザー定義のポイント種別（マスタ）を管理する。
+
+#### GET `/api/budget-mgmt/point-types`
+全ポイント種別を取得（交換レート選択肢を含む）。
+
+**レスポンス**: `200`
+```json
+[
+  {
+    "id": 1,
+    "name": "JCB J-POINT",
+    "sort_order": 0,
+    "created_at": "...",
+    "rate_options": [
+      { "id": 1, "point_type_id": 1, "label": "0.3円/pt", "rate": 0.3, "sort_order": 0 },
+      { "id": 2, "point_type_id": 1, "label": "1円/pt",   "rate": 1.0, "sort_order": 1 }
+    ]
+  }
+]
+```
+
+#### POST `/api/budget-mgmt/point-types`
+ポイント種別を作成。
+
+**リクエスト**: `{ "name": "ポイント種別名" }`
+
+**レスポンス**: `201`（作成されたレコード）
+
+#### PATCH `/api/budget-mgmt/point-types/:id`
+ポイント種別を更新（名前・並び順）。
+
+**リクエスト**: `{ "name": "新しい名前", "sort_order": 1 }`
+
+**レスポンス**: `200`
+
+#### DELETE `/api/budget-mgmt/point-types/:id`
+ポイント種別を削除。関連する rate_options と point_balances_v2 も CASCADE 削除。
+
+**レスポンス**: `204`
+
+---
+
+### ポイント交換レート API
+
+#### POST `/api/budget-mgmt/point-types/:id/rate-options`
+指定ポイント種別に交換レート選択肢を追加。
+
+**リクエスト**: `{ "label": "0.3円/pt", "rate": 0.3 }`
+
+**レスポンス**: `201`（作成されたレコード）
+
+#### PATCH `/api/budget-mgmt/rate-options/:id`
+交換レート選択肢を更新（ラベル・レート・並び順）。
+
+**リクエスト**: `{ "label": "新ラベル", "rate": 0.5, "sort_order": 0 }`
+
+**レスポンス**: `200`
+
+#### DELETE `/api/budget-mgmt/rate-options/:id`
+交換レート選択肢を削除。この選択肢を `selected_rate_option_id` に持つ `point_balances_v2` は NULL に SET NULL。
+
+**レスポンス**: `204`
+
+---
+
+### ポイント残高 v2 API (`/api/budget-mgmt/point-balances`)
+
+ユーザー定義ポイント種別の月次残高を管理する。
+
+#### GET `/api/budget-mgmt/point-balances/:yearMonth`
+指定月の全ポイント残高を取得（point_types・rate_options を JOIN）。
+
+**パラメータ**: `yearMonth` — YYYY-MM
+
+**レスポンス**: `200`
+```json
+[
+  {
+    "id": 1,
+    "year_month": "2026-04",
+    "point_type_id": 1,
+    "balance": 5000,
+    "selected_rate_option_id": 1,
+    "point_type_name": "JCB J-POINT",
+    "rate": 0.3,
+    "rate_label": "0.3円/pt"
+  }
+]
+```
+
+- `rate` / `rate_label`: `selected_rate_option_id` が NULL の場合は `null`
+- 円換算額はフロントエンドで `balance × rate` として計算
+
+#### PUT `/api/budget-mgmt/point-balances/:yearMonth`
+指定月のポイント残高を一括保存（UPSERT）。
+
+**リクエスト**:
+```json
+[
+  { "point_type_id": 1, "balance": 5000, "selected_rate_option_id": 1 },
+  { "point_type_id": 2, "balance": 1200, "selected_rate_option_id": 3 }
+]
+```
+
+**レスポンス**: `200`（更新後の全レコード、GET と同じ形式）
 
 ---
 

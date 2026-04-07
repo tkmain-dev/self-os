@@ -194,6 +194,33 @@ erDiagram
     KPT_ENTRIES ||--o{ KPT_ENTRIES : "carried_from_id"
     WISH_ITEMS ||--o{ WISH_MONTH_PLANS : "has"
 
+    POINT_TYPES {
+        int id PK
+        string name
+        int sort_order
+        string created_at
+    }
+
+    POINT_RATE_OPTIONS {
+        int id PK
+        int point_type_id FK
+        string label
+        real rate
+        int sort_order
+    }
+
+    POINT_BALANCES_V2 {
+        int id PK
+        string year_month
+        int point_type_id FK
+        int balance
+        int selected_rate_option_id FK
+    }
+
+    POINT_TYPES ||--o{ POINT_RATE_OPTIONS : "has"
+    POINT_TYPES ||--o{ POINT_BALANCES_V2 : "has"
+    POINT_RATE_OPTIONS ||--o{ POINT_BALANCES_V2 : "selected_rate_option_id"
+
     BUDGET_ANALYSES {
         int id PK
         string year_month UK
@@ -333,8 +360,10 @@ erDiagram
 | done | INTEGER | NOT NULL, DEFAULT 0 | 完了フラグ |
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+| payment_method | TEXT | NOT NULL, DEFAULT 'cash' | 支払方法（'cash' / 'loan' / 'point:<id>'） |
 
 - **リスト種別**: `wish`（買いたいもの）/ `bucket`（やりたいこと）（CHECK 制約）
+- **payment_method**: `cash`（現金/デビット）/ `loan`（ローン/後払い）/ `point:<point_type_id>`（ポイント払い、IDは point_types テーブルの id）
 
 ### budget_categories（予算カテゴリ）
 
@@ -442,6 +471,46 @@ erDiagram
 - **円換算額**: `balance × exchange_rate` で計算。予算設定タブの「購入可能額」算出に使用
 - **ポイント種別**: `jcb`（JCB J-POINT）/ `amazon`（Amazon ポイント）/ `fukuri`（福利厚生ポイント）
 - **交換レート**: 選択式（例: JCBは0.3〜1.0円/pt）。フロントエンドでプリセット選択肢を提供
+
+### point_types（ポイント種別マスタ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| name | TEXT | NOT NULL | ポイント種別名（例: 「JCB J-POINT」「Amazon ポイント」） |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | 表示順 |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+
+- ユーザーが自由に種別を追加・削除・並び替え可能
+- 削除時は関連する `point_rate_options` と `point_balances_v2` も CASCADE 削除
+
+### point_rate_options（ポイント交換レート選択肢）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| point_type_id | INTEGER | NOT NULL, FK → point_types(id) ON DELETE CASCADE | 親ポイント種別ID |
+| label | TEXT | NOT NULL | 選択肢ラベル（例: 「0.3円/pt」「1円/pt」） |
+| rate | REAL | NOT NULL | 円換算レート（1ポイント = N円） |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | 表示順 |
+
+- 1種別に複数の交換レート選択肢を登録可能
+- ユーザーが種別ごとに選択肢を追加・削除できる
+- 削除時は `point_balances_v2.selected_rate_option_id` が NULL に SET NULL される
+
+### point_balances_v2（ポイント残高 v2）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | レコードID |
+| year_month | TEXT | NOT NULL | 年月（YYYY-MM） |
+| point_type_id | INTEGER | NOT NULL, FK → point_types(id) ON DELETE CASCADE | ポイント種別ID |
+| balance | INTEGER | NOT NULL, DEFAULT 0 | ポイント残高 |
+| selected_rate_option_id | INTEGER | NULL, FK → point_rate_options(id) ON DELETE SET NULL | 選択中の交換レート選択肢ID |
+
+- UNIQUE(year_month, point_type_id): 同一月・同一種別に1レコードのみ
+- **円換算額**: `balance × point_rate_options.rate`（selected_rate_option_id が NULL の場合は 0）
+- 旧 `point_balances` テーブル（固定3種別）を置き換えるユーザー定義ポイント管理テーブル
 
 ### wish_month_plans（月度購入計画）
 

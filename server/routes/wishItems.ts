@@ -14,15 +14,15 @@ router.get('/', (req, res) => {
 
 // Create wish item
 router.post('/', (req, res) => {
-  const { list_type, title, price, url, deadline, memo } = req.body;
+  const { list_type, title, price, url, deadline, memo, payment_method } = req.body;
   const type = list_type || 'wish';
   const maxOrder = db.prepare(
     'SELECT COALESCE(MAX(sort_order), 0) as m FROM wish_items WHERE list_type = ?'
   ).get(type) as { m: number };
 
   const result = db.prepare(
-    'INSERT INTO wish_items (list_type, title, price, url, deadline, memo, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(type, title, price ?? null, url ?? null, deadline ?? null, memo ?? null, maxOrder.m + 1);
+    'INSERT INTO wish_items (list_type, title, price, url, deadline, memo, sort_order, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(type, title, price ?? null, url ?? null, deadline ?? null, memo ?? null, maxOrder.m + 1, payment_method ?? 'cash');
 
   const item = db.prepare('SELECT * FROM wish_items WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(item);
@@ -33,13 +33,13 @@ router.patch('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM wish_items WHERE id = ?').get(req.params.id) as Record<string, unknown>;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
 
-  const { title, price, url, deadline, memo, done } = req.body;
+  const { title, price, url, deadline, memo, done, payment_method } = req.body;
   const newDone = done !== undefined ? done : existing.done;
   const doneAt = done !== undefined
     ? (done ? new Date().toISOString().split('T')[0] : null)
     : existing.done_at;
   db.prepare(
-    'UPDATE wish_items SET title = ?, price = ?, url = ?, deadline = ?, memo = ?, done = ?, done_at = ? WHERE id = ?'
+    'UPDATE wish_items SET title = ?, price = ?, url = ?, deadline = ?, memo = ?, done = ?, done_at = ?, payment_method = ? WHERE id = ?'
   ).run(
     title ?? existing.title,
     price !== undefined ? price : existing.price,
@@ -48,6 +48,7 @@ router.patch('/:id', (req, res) => {
     memo !== undefined ? memo : existing.memo,
     newDone,
     doneAt,
+    payment_method !== undefined ? payment_method : existing.payment_method,
     req.params.id
   );
 

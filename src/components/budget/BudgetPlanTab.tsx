@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useApi, apiPut, apiPost, apiDelete } from '../../hooks/useApi'
-import type { BudgetCategory, BudgetPlan, BudgetIncome, PointBalance } from './types'
-import { POINT_TYPES } from './types'
+import type { BudgetCategory, BudgetPlan, BudgetIncome, PointType, PointBalanceV2 } from './types'
 
 interface WishItemForPlan {
-  id: number; title: string; price: number | null; deadline: string | null; done: number
+  id: number; title: string; price: number | null; deadline: string | null; done: number; payment_method: string
 }
 
 function fmt(v: number): string {
@@ -357,29 +356,37 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
   const { data: categories, loading: catLoading, refetch: refetchCategories } = useApi<BudgetCategory[]>('/api/budget-mgmt/categories')
   const { data: plans, refetch: refetchPlans } = useApi<BudgetPlan[]>(`/api/budget-mgmt/plans/${yearMonth}`)
   const { data: income, refetch: refetchIncome } = useApi<BudgetIncome>(`/api/budget-mgmt/income/${yearMonth}`)
-  const { data: pointsData, refetch: refetchPoints } = useApi<PointBalance[]>(`/api/budget-mgmt/points/${yearMonth}`)
+  const { data: pointTypes, refetch: refetchPointTypes } = useApi<PointType[]>('/api/budget-mgmt/point-types')
+  const { data: pointBalances, refetch: refetchPointBalances } = useApi<PointBalanceV2[]>(`/api/budget-mgmt/point-balances/${yearMonth}`)
   const { data: wishItems } = useApi<WishItemForPlan[]>('/api/wish-items?type=wish')
 
   const [incomeRaw, setIncomeRaw] = useState('')
   const [incomeRecurring, setIncomeRecurring] = useState(1)
   const [savingsRaw, setSavingsRaw] = useState('')
-  const [pointDrafts, setPointDrafts] = useState<Record<string, { balance: string; exchange_rate: number; exchange_label: string }>>({})
+  // Keyed by point_type_id
+  const [pointDrafts, setPointDrafts] = useState<Record<number, { balance: string; selected_rate_option_id: number | null }>>({})
+  // Point type management UI state
+  const [addingPointType, setAddingPointType] = useState(false)
+  const [newPointName, setNewPointName] = useState('')
+  const [editingRatesFor, setEditingRatesFor] = useState<number | null>(null)
+  const [newRateLabel, setNewRateLabel] = useState('')
+  const [newRateValue, setNewRateValue] = useState('')
   const [addingTo, setAddingTo] = useState<number | null>(null)
   const [newSubName, setNewSubName] = useState('')
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set())
 
   useEffect(() => {
+    if (!pointTypes) return
     const drafts: typeof pointDrafts = {}
-    for (const [key, def] of Object.entries(POINT_TYPES)) {
-      const saved = pointsData?.find(p => p.point_type === key)
-      drafts[key] = {
+    for (const pt of pointTypes) {
+      const saved = pointBalances?.find(p => p.point_type_id === pt.id)
+      drafts[pt.id] = {
         balance: saved ? String(saved.balance) : '',
-        exchange_rate: saved?.exchange_rate ?? def.options[0].rate,
-        exchange_label: saved?.exchange_label || def.options[0].label,
+        selected_rate_option_id: saved?.selected_rate_option_id ?? (pt.rate_options[0]?.id ?? null),
       }
     }
     setPointDrafts(drafts)
-  }, [pointsData])
+  }, [pointTypes, pointBalances])
 
   useEffect(() => {
     if (income) {
@@ -409,16 +416,43 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     refetchIncome()
   }, [yearMonth, incomeRaw, savingsRaw, incomeRecurring, refetchIncome])
 
-  const savePoints = useCallback(async () => {
-    const arr = Object.entries(pointDrafts).map(([key, d]) => ({
-      point_type: key,
+  const savePoints = useCallback(async (overrideDrafts?: typeof pointDrafts) => {
+    const source = overrideDrafts ?? pointDrafts
+    const balances = Object.entries(source).map(([id, d]) => ({
+      point_type_id: Number(id),
       balance: parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0,
-      exchange_rate: d.exchange_rate,
-      exchange_label: d.exchange_label,
+      selected_rate_option_id: d.selected_rate_option_id,
     }))
-    await apiPut(`/api/budget-mgmt/points/${yearMonth}`, { points: arr })
-    refetchPoints()
-  }, [yearMonth, pointDrafts, refetchPoints])
+    await apiPut(`/api/budget-mgmt/point-balances/${yearMonth}`, { balances })
+    refetchPointBalances()
+  }, [yearMonth, pointDrafts, refetchPointBalances])
+
+  // Point type CRUD
+  const addPointType = async () => {
+    if (!newPointName.trim()) return
+    await apiPost('/api/budget-mgmt/point-types', { name: newPointName.trim() })
+    setNewPointName('')
+    setAddingPointType(false)
+    refetchPointTypes()
+  }
+  const deletePointType = async (id: number) => {
+    if (!confirm('このポイント種別を削除しますか？関連する残高・レートも削除されます。')) return
+    await apiDelete(`/api/budget-mgmt/point-types/${id}`)
+    refetchPointTypes()
+    refetchPointBalances()
+  }
+  const addRateOption = async (ptId: number) => {
+    const rate = parseFloat(newRateValue)
+    if (!newRateLabel.trim() || isNaN(rate)) return
+    await apiPost(`/api/budget-mgmt/point-types/${ptId}/rate-options`, { label: newRateLabel.trim(), rate })
+    setNewRateLabel('')
+    setNewRateValue('')
+    refetchPointTypes()
+  }
+  const deleteRateOption = async (id: number) => {
+    await apiDelete(`/api/budget-mgmt/rate-options/${id}`)
+    refetchPointTypes()
+  }
 
   const copyPrevious = async () => {
     await apiPost(`/api/budget-mgmt/plans/${yearMonth}/copy-previous`, {})
@@ -457,6 +491,46 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
     return wishItems.filter(i => !i.done && i.deadline && i.deadline >= from && i.deadline <= to)
   }, [wishItems, yearMonth])
 
+  // Helper: get rate for a point type from draft
+  const getRateForDraft = useCallback((ptId: number): number => {
+    const d = pointDrafts[ptId]
+    if (!d) return 1
+    const pt = pointTypes?.find(p => p.id === ptId)
+    const opt = pt?.rate_options.find(o => o.id === d.selected_rate_option_id)
+    return opt?.rate ?? 1
+  }, [pointDrafts, pointTypes])
+
+  // Helper: get point yen balance for a specific point type
+  const getPointYenBalance = useCallback((ptId: number): number => {
+    const d = pointDrafts[ptId]
+    if (!d) return 0
+    const b = parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0
+    return Math.floor(b * getRateForDraft(ptId))
+  }, [pointDrafts, getRateForDraft])
+
+  // Group planned items by payment method for summary
+  const groupedPlanned = useMemo(() => {
+    const groups = new Map<string, { label: string; items: WishItemForPlan[]; total: number }>()
+    const labelOf = (pm: string): string => {
+      if (pm === 'cash') return '現金'
+      if (pm === 'loan') return 'ローン'
+      if (pm.startsWith('point:')) {
+        const id = Number(pm.slice(6))
+        const pt = pointTypes?.find(p => p.id === id)
+        return pt ? pt.name : 'ポイント'
+      }
+      return '現金'
+    }
+    for (const item of plannedItems) {
+      const key = item.payment_method || 'cash'
+      const g = groups.get(key) ?? { label: labelOf(key), items: [], total: 0 }
+      g.items.push(item)
+      g.total += item.price ?? 0
+      groups.set(key, g)
+    }
+    return groups
+  }, [plannedItems, pointTypes])
+
   const toggleCat = (catId: number) => {
     setExpandedCats(prev => {
       const next = new Set(prev)
@@ -470,14 +544,10 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
 
   const totalBudget = plans?.reduce((sum, p) => sum + p.amount, 0) ?? 0
   const savingsTarget = (income?.amount ?? 0) - totalBudget
-  const wishAllocated = plannedItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
 
   // Purchase power calculation
   const surplusBudget = savingsTarget - (income?.savings_target ?? 0)
-  const pointYenTotal = Object.entries(pointDrafts).reduce((sum, [, d]) => {
-    const b = parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0
-    return sum + Math.floor(b * d.exchange_rate)
-  }, 0)
+  const pointYenTotal = Object.keys(pointDrafts).reduce((sum, id) => sum + getPointYenBalance(Number(id)), 0)
   const purchasePower = surplusBudget + pointYenTotal
 
   const fixedTotal = categories?.filter(c => c.type === 'fixed')
@@ -588,58 +658,121 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
 
       {/* Point balances */}
       <div className="bg-[#16161e] rounded-2xl border border-[#2a2a3a] overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-violet-500/8 from-[#16161e]">
+        <div className="px-5 py-3 border-b border-[#2a2a3a] bg-gradient-to-r from-violet-500/8 from-[#16161e] flex items-center justify-between">
           <span className="text-sm font-semibold text-[#e4e4ec]">ポイント資産</span>
+          <button
+            onClick={() => setAddingPointType(true)}
+            className="text-[10px] px-2 py-1 rounded-md bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+          >
+            + 追加
+          </button>
         </div>
         <div className="px-5">
-          {Object.entries(POINT_TYPES).map(([key, def]) => {
-            const draft = pointDrafts[key]
+          {addingPointType && (
+            <div className="flex items-center gap-2 py-2.5 border-b border-[#1e1e2a]">
+              <input
+                type="text"
+                value={newPointName}
+                onChange={e => setNewPointName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addPointType()}
+                placeholder="ポイント名"
+                autoFocus
+                className="flex-1 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-1 text-sm text-white placeholder-[#3a3a4a] focus:border-violet-500/50 focus:outline-none"
+              />
+              <button onClick={addPointType} className="text-xs px-2 py-1 rounded bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-colors">追加</button>
+              <button onClick={() => { setAddingPointType(false); setNewPointName('') }} className="text-xs text-[#5a5a6e] hover:text-white">×</button>
+            </div>
+          )}
+          {(!pointTypes || pointTypes.length === 0) && !addingPointType && (
+            <div className="py-4 text-center text-xs text-[#5a5a6e]">
+              「+ 追加」からポイント種別を登録してください
+            </div>
+          )}
+          {pointTypes?.map(pt => {
+            const draft = pointDrafts[pt.id]
             if (!draft) return null
             const balanceNum = parseInt(draft.balance.replace(/,/g, '') || '0', 10) || 0
-            const yenValue = Math.floor(balanceNum * draft.exchange_rate)
+            const yenValue = getPointYenBalance(pt.id)
+            const isEditingRates = editingRatesFor === pt.id
             return (
-              <div key={key} className="flex items-center gap-2 py-2.5 border-b border-[#1e1e2a] last:border-0">
-                <span className="text-sm text-[#8b8b9e] flex-1">{def.label}</span>
-                {def.options.length > 1 && (
-                  <select
-                    value={draft.exchange_label}
-                    onChange={e => {
-                      const opt = def.options.find(o => o.label === e.target.value)
-                      if (!opt) return
-                      setPointDrafts(prev => {
-                        const next = { ...prev, [key]: { ...prev[key], exchange_rate: opt.rate, exchange_label: opt.label } }
-                        // Save immediately with updated state
-                        const arr = Object.entries(next).map(([k, d]) => ({
-                          point_type: k,
-                          balance: parseInt(d.balance.replace(/,/g, '') || '0', 10) || 0,
-                          exchange_rate: d.exchange_rate,
-                          exchange_label: d.exchange_label,
-                        }))
-                        apiPut(`/api/budget-mgmt/points/${yearMonth}`, { points: arr })
-                        return next
-                      })
-                    }}
-                    className="bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-1.5 py-1 text-[10px] text-[#e4e4ec] focus:outline-none focus:border-violet-500/50 cursor-pointer"
+              <div key={pt.id} className="py-2.5 border-b border-[#1e1e2a] last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-[#8b8b9e] flex-1">{pt.name}</span>
+                  <button
+                    onClick={() => setEditingRatesFor(isEditingRates ? null : pt.id)}
+                    className="text-[9px] px-1.5 py-0.5 rounded border bg-[#1a1a2e] text-[#5a5a6e] border-[#2a2a3a] hover:text-violet-400 hover:border-violet-500/30"
                   >
-                    {def.options.map(o => (
-                      <option key={o.label} value={o.label}>{o.label} ({o.rate}円/pt)</option>
-                    ))}
-                  </select>
-                )}
-                <div className="relative shrink-0">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={draft.balance}
-                    onChange={e => setPointDrafts(prev => ({ ...prev, [key]: { ...prev[key], balance: e.target.value } }))}
-                    onBlur={savePoints}
-                    placeholder="0"
-                    className="w-24 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pr-7 pl-2 py-1 text-sm text-right text-white placeholder-[#3a3a4a] focus:border-violet-500/50 focus:outline-none transition-colors"
-                  />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#5a5a6e]">pt</span>
+                    {isEditingRates ? '閉じる' : 'レート'}
+                  </button>
+                  <button
+                    onClick={() => deletePointType(pt.id)}
+                    className="text-[9px] text-[#5a5a6e] hover:text-red-400"
+                  >×</button>
+                  {pt.rate_options.length > 1 && (
+                    <select
+                      value={draft.selected_rate_option_id ?? ''}
+                      onChange={e => {
+                        const optId = Number(e.target.value)
+                        setPointDrafts(prev => {
+                          const next = { ...prev, [pt.id]: { ...prev[pt.id], selected_rate_option_id: optId } }
+                          savePoints(next)
+                          return next
+                        })
+                      }}
+                      className="bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-1.5 py-1 text-[10px] text-[#e4e4ec] focus:outline-none focus:border-violet-500/50 cursor-pointer"
+                    >
+                      {pt.rate_options.map(o => (
+                        <option key={o.id} value={o.id}>{o.label} ({o.rate}円/pt)</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="relative shrink-0">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={draft.balance}
+                      onChange={e => setPointDrafts(prev => ({ ...prev, [pt.id]: { ...prev[pt.id], balance: e.target.value } }))}
+                      onBlur={() => savePoints()}
+                      placeholder="0"
+                      className="w-24 bg-[#0e0e12] border border-[#2a2a3a] rounded-lg pr-7 pl-2 py-1 text-sm text-right text-white placeholder-[#3a3a4a] focus:border-violet-500/50 focus:outline-none transition-colors"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#5a5a6e]">pt</span>
+                  </div>
+                  {balanceNum > 0 && (
+                    <span className="text-xs font-mono text-violet-300 shrink-0 w-16 text-right">{fmt(yenValue)}</span>
+                  )}
                 </div>
-                {balanceNum > 0 && (
-                  <span className="text-xs font-mono text-violet-300 shrink-0 w-16 text-right">{fmt(yenValue)}</span>
+                {isEditingRates && (
+                  <div className="mt-2 pl-2 border-l-2 border-violet-500/20 space-y-1">
+                    {pt.rate_options.map(o => (
+                      <div key={o.id} className="flex items-center gap-2 text-xs">
+                        <span className="text-[#c0c0d0] flex-1">{o.label}</span>
+                        <span className="text-[#8b8b9e] font-mono">{o.rate} 円/pt</span>
+                        <button onClick={() => deleteRateOption(o.id)} className="text-[#5a5a6e] hover:text-red-400 text-xs">×</button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1 pt-1">
+                      <input
+                        type="text"
+                        value={newRateLabel}
+                        onChange={e => setNewRateLabel(e.target.value)}
+                        placeholder="ラベル"
+                        className="flex-1 bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-0.5 text-[11px] text-white focus:border-violet-500/50 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={newRateValue}
+                        onChange={e => setNewRateValue(e.target.value)}
+                        placeholder="1.0"
+                        className="w-14 bg-[#0e0e12] border border-[#2a2a3a] rounded px-2 py-0.5 text-[11px] text-right text-white focus:border-violet-500/50 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => addRateOption(pt.id)}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20"
+                      >+</button>
+                    </div>
+                  </div>
                 )}
               </div>
             )
@@ -670,27 +803,45 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
             </span>
           </div>
           {plannedItems.length > 0 && (
-            <>
-              <div className="text-[10px] text-[#5a5a6e] mt-2 mb-1">今月の購入予定</div>
-              {plannedItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-1">
-                  <span className="text-xs text-[#c0c0d0] truncate flex-1">{item.title}</span>
-                  <span className="text-[10px] text-[#5a5a6e] shrink-0 ml-2">{item.deadline?.slice(5).replace('-', '/')}</span>
-                  <span className="text-xs font-mono text-[#e4e4ec] shrink-0 ml-2 w-16 text-right">{item.price ? fmt(item.price) : '—'}</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between py-1.5 border-t border-[#1e1e2a] mt-1">
-                <span className="text-xs text-[#8b8b9e]">購入予定合計</span>
-                <span className="text-xs font-mono text-[#e4e4ec]">{fmt(wishAllocated)}</span>
-              </div>
-            </>
+            <div className="mt-2 space-y-2">
+              <div className="text-[10px] text-[#5a5a6e]">今月の購入予定（支払方法別）</div>
+              {[...groupedPlanned.entries()].map(([key, g]) => {
+                const isPoint = key.startsWith('point:')
+                const isLoan = key === 'loan'
+                const color = isPoint ? 'text-violet-300' : isLoan ? 'text-sky-300' : 'text-[#e4e4ec]'
+                return (
+                  <div key={key} className="bg-[#0e0e12]/50 rounded-lg px-2 py-1.5 border border-[#1e1e2a]">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[11px] font-semibold ${color}`}>{g.label}</span>
+                      <span className={`text-xs font-mono ${color}`}>{fmt(g.total)}</span>
+                    </div>
+                    {g.items.map(item => (
+                      <div key={item.id} className="flex items-center justify-between py-0.5">
+                        <span className="text-xs text-[#c0c0d0] truncate flex-1">{item.title}</span>
+                        <span className="text-[10px] text-[#5a5a6e] shrink-0 ml-2">{item.deadline?.slice(5).replace('-', '/')}</span>
+                        <span className="text-xs font-mono text-[#8b8b9e] shrink-0 ml-2 w-16 text-right">{item.price ? fmt(item.price) : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
           )}
-          <div className="flex items-center justify-between py-2.5 border-t border-[#2a2a3a]">
-            <span className="text-sm font-semibold text-[#e4e4ec]">残り購入可能額</span>
-            <span className={`text-sm font-mono font-bold ${(purchasePower - wishAllocated) >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-              {fmt(purchasePower - wishAllocated)}
-            </span>
-          </div>
+          {(() => {
+            // Calculate remaining by excluding loan from subtraction
+            const nonLoanTotal = [...groupedPlanned.entries()]
+              .filter(([key]) => key !== 'loan')
+              .reduce((sum, [, g]) => sum + g.total, 0)
+            const remaining = purchasePower - nonLoanTotal
+            return (
+              <div className="flex items-center justify-between py-2.5 border-t border-[#2a2a3a] mt-2">
+                <span className="text-sm font-semibold text-[#e4e4ec]">残り購入可能額</span>
+                <span className={`text-sm font-mono font-bold ${remaining >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                  {fmt(remaining)}
+                </span>
+              </div>
+            )
+          })()}
         </div>
       </div>
       </div>

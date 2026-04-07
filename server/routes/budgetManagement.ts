@@ -368,6 +368,108 @@ router.delete('/wish-plans/:yearMonth/:wishItemId', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── FR#56: Point Types (user-defined) ──
+
+interface PointTypeRow { id: number; name: string; sort_order: number }
+interface PointRateRow { id: number; point_type_id: number; label: string; rate: number; sort_order: number }
+
+router.get('/point-types', (_req, res) => {
+  const types = db.prepare('SELECT * FROM point_types ORDER BY sort_order, id').all() as PointTypeRow[];
+  const options = db.prepare('SELECT * FROM point_rate_options ORDER BY point_type_id, sort_order, id').all() as PointRateRow[];
+  const result = types.map(t => ({
+    ...t,
+    rate_options: options.filter(o => o.point_type_id === t.id),
+  }));
+  res.json(result);
+});
+
+router.post('/point-types', (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) { res.status(400).json({ error: 'name required' }); return; }
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM point_types').get() as { next: number };
+  const result = db.prepare('INSERT INTO point_types (name, sort_order) VALUES (?, ?)').run(name.trim(), maxOrder.next);
+  res.json({ id: result.lastInsertRowid, name: name.trim(), sort_order: maxOrder.next, rate_options: [] });
+});
+
+router.patch('/point-types/:id', (req, res) => {
+  const { name, sort_order } = req.body;
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (name !== undefined) { sets.push('name = ?'); vals.push(name); }
+  if (sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(sort_order); }
+  if (sets.length === 0) { res.status(400).json({ error: 'nothing to update' }); return; }
+  vals.push(req.params.id);
+  db.prepare(`UPDATE point_types SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  res.json({ ok: true });
+});
+
+router.delete('/point-types/:id', (req, res) => {
+  db.prepare('DELETE FROM point_types WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Rate options CRUD
+router.post('/point-types/:id/rate-options', (req, res) => {
+  const { label, rate } = req.body;
+  if (!label?.trim() || typeof rate !== 'number') { res.status(400).json({ error: 'label and rate required' }); return; }
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM point_rate_options WHERE point_type_id = ?').get(req.params.id) as { next: number };
+  const result = db.prepare('INSERT INTO point_rate_options (point_type_id, label, rate, sort_order) VALUES (?, ?, ?, ?)').run(req.params.id, label.trim(), rate, maxOrder.next);
+  res.json({ id: result.lastInsertRowid, point_type_id: Number(req.params.id), label: label.trim(), rate, sort_order: maxOrder.next });
+});
+
+router.patch('/rate-options/:id', (req, res) => {
+  const { label, rate } = req.body;
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (label !== undefined) { sets.push('label = ?'); vals.push(label); }
+  if (rate !== undefined) { sets.push('rate = ?'); vals.push(rate); }
+  if (sets.length === 0) { res.status(400).json({ error: 'nothing to update' }); return; }
+  vals.push(req.params.id);
+  db.prepare(`UPDATE point_rate_options SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  res.json({ ok: true });
+});
+
+router.delete('/rate-options/:id', (req, res) => {
+  db.prepare('DELETE FROM point_rate_options WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── FR#56: New point balances API (using point_type_id) ──
+
+router.get('/point-balances/:yearMonth', (req, res) => {
+  const rows = db.prepare('SELECT * FROM point_balances_v2 WHERE year_month = ?').all(req.params.yearMonth);
+  res.json(rows);
+});
+
+router.put('/point-balances/:yearMonth', (req, res) => {
+  const ym = req.params.yearMonth;
+  const { balances } = req.body as {
+    balances: { point_type_id: number; balance: number; selected_rate_option_id: number | null }[];
+  };
+  if (!Array.isArray(balances)) { res.status(400).json({ error: 'balances array required' }); return; }
+
+  const upsert = db.prepare(`
+    INSERT INTO point_balances_v2 (year_month, point_type_id, balance, selected_rate_option_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(year_month, point_type_id) DO UPDATE SET balance = excluded.balance, selected_rate_option_id = excluded.selected_rate_option_id
+  `);
+  const del = db.prepare('DELETE FROM point_balances_v2 WHERE year_month = ? AND point_type_id = ?');
+
+  const tx = db.transaction(() => {
+    for (const b of balances) {
+      if (b.balance === 0) {
+        del.run(ym, b.point_type_id);
+      } else {
+        upsert.run(ym, b.point_type_id, b.balance, b.selected_rate_option_id);
+      }
+    }
+  });
+  tx();
+
+  const rows = db.prepare('SELECT * FROM point_balances_v2 WHERE year_month = ?').all(ym);
+  res.json(rows);
+});
+
 // ── AI Analysis ──
 
 function getYearMonth(ym: string, offset: number): string {

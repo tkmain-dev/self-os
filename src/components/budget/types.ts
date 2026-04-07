@@ -89,23 +89,27 @@ export interface BudgetAnalysis {
   savings_tips: string[]
 }
 
-export const POINT_TYPES = {
-  jcb_jpoint: {
-    label: 'JCB J-POINT',
-    options: [
-      { label: 'MyJCB Pay', rate: 1.0 },
-      { label: 'JCBギフトカード', rate: 1.0 },
-      { label: 'カード支払い充当', rate: 0.7 },
-      { label: 'Amazon利用', rate: 0.7 },
-      { label: '他社ポイント交換', rate: 0.7 },
-    ],
-  },
-  amazon: {
-    label: 'Amazonポイント',
-    options: [{ label: 'Amazonポイント', rate: 1.0 }],
-  },
-  welfare: {
-    label: '福利厚生ポイント',
-    options: [{ label: '福利厚生ポイント', rate: 1.0 }],
-  },
-} as const
+export interface PointRateOption {
+  id: number
+  point_type_id: number
+  label: string
+  rate: number
+  sort_order: number
+}
+
+export interface PointType {
+  id: number
+  name: string
+  sort_order: number
+  rate_options: PointRateOption[]
+}
+
+export interface PointBalanceV2 {
+  id?: number
+  year_month: string
+  point_type_id: number
+  balance: number
+  selected_rate_option_id: number | null
+}
+
+export type PaymentMethod = 'cash' | 'loan' | `point:${number}`

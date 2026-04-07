@@ -269,6 +269,7 @@ try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_date TEXT`) } catch { /* a
 try { db.exec(`ALTER TABLE goals ADD COLUMN milestone_label TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE budget_plans ADD COLUMN formula TEXT`) } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE budget_income ADD COLUMN savings_target INTEGER NOT NULL DEFAULT 0`) } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE wish_items ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash'`) } catch { /* already exists */ }
 
 // ── FR#47: ポイント残高 + ウィッシュ月度計画 ──
 db.exec(`
@@ -280,6 +281,34 @@ db.exec(`
     exchange_rate REAL NOT NULL DEFAULT 1.0,
     exchange_label TEXT NOT NULL DEFAULT '',
     UNIQUE(year_month, point_type)
+  );
+
+  -- FR#56: User-defined point types with multiple rate options
+  CREATE TABLE IF NOT EXISTS point_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  CREATE TABLE IF NOT EXISTS point_rate_options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    point_type_id INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    rate REAL NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (point_type_id) REFERENCES point_types(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS point_balances_v2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_month TEXT NOT NULL,
+    point_type_id INTEGER NOT NULL,
+    balance INTEGER NOT NULL DEFAULT 0,
+    selected_rate_option_id INTEGER,
+    FOREIGN KEY (point_type_id) REFERENCES point_types(id) ON DELETE CASCADE,
+    FOREIGN KEY (selected_rate_option_id) REFERENCES point_rate_options(id) ON DELETE SET NULL,
+    UNIQUE(year_month, point_type_id)
   );
 
   CREATE TABLE IF NOT EXISTS wish_month_plans (
