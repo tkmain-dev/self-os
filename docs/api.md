@@ -667,6 +667,11 @@ CSV データから実績を一括取込。`csv_id` で重複排除。
 
 **レスポンス**: `200`（更新後の全レコード、GET と同じ形式）
 
+#### POST `/api/budget-mgmt/point-balances/:yearMonth/copy-previous`
+前月のポイント残高を当月にコピー（UPSERT）。当月に既存データがある場合は上書き。
+
+**レスポンス**: `200 { "copied": N }` — コピーしたレコード数
+
 ---
 
 ### GET `/api/budget-mgmt/wish-plans/:yearMonth`

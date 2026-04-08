@@ -196,6 +196,33 @@ router.post('/income/:yearMonth/copy-previous', (req, res) => {
   res.json({ copied: true });
 });
 
+// POST /api/budget-mgmt/point-balances/:yearMonth/copy-previous
+router.post('/point-balances/:yearMonth/copy-previous', (req, res) => {
+  const ym = req.params.yearMonth;
+  const [y, m] = ym.split('-').map(Number);
+  const prevDate = new Date(y, m - 2, 1);
+  const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const prevBalances = db.prepare(
+    'SELECT point_type_id, balance, selected_rate_option_id FROM point_balances_v2 WHERE year_month = ?'
+  ).all(prevYm) as { point_type_id: number; balance: number; selected_rate_option_id: number | null }[];
+
+  const upsert = db.prepare(`
+    INSERT INTO point_balances_v2 (year_month, point_type_id, balance, selected_rate_option_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(year_month, point_type_id) DO UPDATE SET balance = excluded.balance, selected_rate_option_id = excluded.selected_rate_option_id
+  `);
+
+  const tx = db.transaction(() => {
+    for (const b of prevBalances) {
+      upsert.run(ym, b.point_type_id, b.balance, b.selected_rate_option_id);
+    }
+  });
+  tx();
+
+  res.json({ copied: prevBalances.length });
+});
+
 // ── CSV Import (Actuals) ──
 
 // GET /api/budget-mgmt/actuals/:yearMonth

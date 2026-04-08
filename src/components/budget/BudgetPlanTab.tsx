@@ -457,8 +457,10 @@ export default function BudgetPlanTab({ yearMonth }: { yearMonth: string }) {
   const copyPrevious = async () => {
     await apiPost(`/api/budget-mgmt/plans/${yearMonth}/copy-previous`, {})
     await apiPost(`/api/budget-mgmt/income/${yearMonth}/copy-previous`, {})
+    await apiPost(`/api/budget-mgmt/point-balances/${yearMonth}/copy-previous`, {})
     refetchPlans()
     refetchIncome()
+    refetchPointBalances()
   }
 
   const addSubcategory = async (categoryId: number) => {
