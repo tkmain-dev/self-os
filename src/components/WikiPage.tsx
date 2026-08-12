@@ -162,7 +162,28 @@ function WikiEditor({ pageId, ancestors, onTitleChanged, onDeleted, onNavigate }
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [newLinkDate, setNewLinkDate] = useState('')
   const [toc, setToc] = useState<TocItem[]>([])
+  const [tocWidth, setTocWidth] = useState(192) // default = w-48
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // TOC resize: drag left edge; expanded part overlays the document (layout width stays fixed)
+  const startTocDrag = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = tocWidth
+    const onMove = (ev: MouseEvent) => {
+      setTocWidth(Math.min(640, Math.max(192, startW + (startX - ev.clientX))))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   const editor = useCreateBlockNote({
     initialContent,
@@ -339,22 +360,36 @@ function WikiEditor({ pageId, ancestors, onTitleChanged, onDeleted, onNavigate }
       </div>
     </div>
 
-    {/* Table of contents (desktop only, sticky) */}
+    {/* Table of contents (desktop only, sticky, resizable) */}
     {toc.length > 0 && (
-      <div className="hidden lg:block w-48 shrink-0 sticky top-4">
-        <div className="text-[11px] text-[#8b8b9e] font-semibold mb-2 px-2 uppercase tracking-wider">このページの内容</div>
-        <div className="border-l border-[#2a2a3a] space-y-0.5">
-          {toc.map(item => (
-            <button
-              key={item.id}
-              onClick={() => scrollToBlock(item.id)}
-              className="block w-full text-left text-xs text-[#8b8b9e] hover:text-sky-400 hover:border-l-2 hover:border-sky-400 hover:-ml-px truncate py-1 transition-colors"
-              style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
-              title={item.text}
-            >
-              {item.text || '(空の見出し)'}
-            </button>
-          ))}
+      <div className="hidden lg:block w-48 shrink-0 sticky top-4 relative z-30">
+        {/* Inner panel is right-anchored: widening overlays the document without moving layout */}
+        <div
+          className={`absolute top-0 right-0 ${tocWidth > 192 ? 'bg-[#16161e]/75 border border-[#3a3a4e] rounded-lg shadow-lg shadow-black/30 p-2' : ''}`}
+          style={{ width: `${tocWidth}px`, maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto', zIndex: 50 }}
+        >
+          {/* Drag handle (left edge) */}
+          <div
+            onMouseDown={startTocDrag}
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize rounded-full hover:bg-sky-500/40 transition-colors"
+            title="ドラッグで幅を調整"
+          />
+          <div className="pl-2">
+            <div className="text-[11px] text-[#8b8b9e] font-semibold mb-2 px-2 uppercase tracking-wider">このページの内容</div>
+            <div className="border-l border-[#2a2a3a] space-y-0.5">
+              {toc.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => scrollToBlock(item.id)}
+                  className="block w-full text-left text-xs text-[#8b8b9e] hover:text-sky-400 hover:border-l-2 hover:border-sky-400 hover:-ml-px truncate py-1 transition-colors"
+                  style={{ paddingLeft: `${8 + (item.level - 1) * 12}px` }}
+                  title={item.text}
+                >
+                  {item.text || '(空の見出し)'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )}
@@ -411,6 +446,36 @@ export default function WikiPage() {
 
   const handleDeleted = useCallback(() => setSelectedId(null), [])
 
+  // Tree sidebar resize (desktop only): widening overlays the document, layout width stays w-60
+  const [treeWidth, setTreeWidth] = useState(240) // default = w-60
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  const startTreeDrag = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = treeWidth
+    const onMove = (ev: MouseEvent) => {
+      setTreeWidth(Math.min(640, Math.max(240, startW + (ev.clientX - startX))))
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   return (
     <div className="w-full max-w-[1800px] mx-auto">
       <div className="mb-4 pb-4 border-b border-[#2a2a3a] bg-gradient-to-r from-sky-500/8 to-transparent -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1">
@@ -419,35 +484,49 @@ export default function WikiPage() {
       </div>
 
       <div className="flex gap-5 items-start">
-        {/* Tree sidebar (hidden on mobile when a page is selected, sticky on desktop) */}
-        <div className={`w-full md:w-60 shrink-0 md:sticky md:top-4 ${selectedId !== null ? 'hidden md:block' : ''}`}>
-          <button
-            onClick={() => createPage(null)}
-            className="w-full mb-3 px-3 py-1.5 text-sm rounded-lg bg-gradient-to-r from-sky-500/15 to-violet-500/10 text-sky-300 border border-sky-500/30 hover:from-sky-500/25 hover:to-violet-500/20 transition-colors"
+        {/* Tree sidebar (hidden on mobile when a page is selected, sticky + resizable on desktop) */}
+        <div className={`w-full md:w-60 shrink-0 md:sticky md:top-4 md:relative md:z-30 ${selectedId !== null ? 'hidden md:block' : ''}`}>
+          {/* Inner panel is left-anchored on desktop: widening overlays the document without moving layout */}
+          <div
+            className={`md:absolute md:top-0 md:left-0 ${isDesktop && treeWidth > 240 ? 'bg-[#16161e]/75 border border-[#3a3a4e] rounded-lg shadow-lg shadow-black/30 p-2' : ''}`}
+            style={isDesktop ? { width: `${treeWidth}px`, maxHeight: 'calc(100vh - 3rem)', overflowY: 'auto', zIndex: 50 } : undefined}
           >
-            + 新規ページ
-          </button>
-          <div className="text-[11px] text-[#8b8b9e] font-semibold mb-1.5 px-2 uppercase tracking-wider">ページ</div>
-          <div className="max-h-[70vh] overflow-y-auto pr-1">
-            {tree.length === 0 ? (
-              <div className="text-xs text-[#5a5a6e] text-center py-6">
-                「+ 新規ページ」から作成してください
+            {/* Drag handle (right edge, desktop only) */}
+            <div
+              onMouseDown={startTreeDrag}
+              className="hidden md:block absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize rounded-full hover:bg-sky-500/40 transition-colors"
+              title="ドラッグで幅を調整"
+            />
+            <div className="md:pr-2">
+              <button
+                onClick={() => createPage(null)}
+                className="w-full mb-3 px-3 py-1.5 text-sm rounded-lg bg-gradient-to-r from-sky-500/15 to-violet-500/10 text-sky-300 border border-sky-500/30 hover:from-sky-500/25 hover:to-violet-500/20 transition-colors"
+              >
+                + 新規ページ
+              </button>
+              <div className="text-[11px] text-[#8b8b9e] font-semibold mb-1.5 px-2 uppercase tracking-wider">ページ</div>
+              <div className="max-h-[70vh] overflow-y-auto pr-1">
+                {tree.length === 0 ? (
+                  <div className="text-xs text-[#5a5a6e] text-center py-6">
+                    「+ 新規ページ」から作成してください
+                  </div>
+                ) : (
+                  tree.map(node => (
+                    <TreeItem
+                      key={node.id}
+                      node={node}
+                      depth={0}
+                      selectedId={selectedId}
+                      expanded={expanded}
+                      onSelect={setSelectedId}
+                      onToggle={toggle}
+                      onAddChild={createPage}
+                      onDelete={deletePage}
+                    />
+                  ))
+                )}
               </div>
-            ) : (
-              tree.map(node => (
-                <TreeItem
-                  key={node.id}
-                  node={node}
-                  depth={0}
-                  selectedId={selectedId}
-                  expanded={expanded}
-                  onSelect={setSelectedId}
-                  onToggle={toggle}
-                  onAddChild={createPage}
-                  onDelete={deletePage}
-                />
-              ))
-            )}
+            </div>
           </div>
         </div>
 
