@@ -1,13 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
-import DailyPage from './components/DailyPage'
-import CalendarPage from './components/calendar/CalendarPage'
-import GoalGantt from './components/GoalGantt'
-import WishListPage from './components/WishListPage'
-import BudgetPage from './components/BudgetPage'
-import KptPage from './components/KptPage'
 import LoginPage from './components/LoginPage'
+
+// Lazy-loaded pages — each becomes a separate chunk
+const DailyPage = lazy(() => import('./components/DailyPage'))
+const CalendarPage = lazy(() => import('./components/calendar/CalendarPage'))
+const GoalGantt = lazy(() => import('./components/GoalGantt'))
+const WishListPage = lazy(() => import('./components/WishListPage'))
+const BudgetPage = lazy(() => import('./components/BudgetPage'))
+const KptPage = lazy(() => import('./components/KptPage'))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+    </div>
+  )
+}
 
 function App() {
   const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading')
@@ -34,15 +44,17 @@ function App() {
 
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/daily" replace />} />
-        <Route path="/daily" element={<DailyPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/goals" element={<GoalGantt />} />
-        <Route path="/wishlist" element={<WishListPage />} />
-        <Route path="/budget" element={<BudgetPage />} />
-        <Route path="/kpt" element={<KptPage />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/daily" replace />} />
+          <Route path="/daily" element={<DailyPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/goals" element={<GoalGantt />} />
+          <Route path="/wishlist" element={<WishListPage />} />
+          <Route path="/budget" element={<BudgetPage />} />
+          <Route path="/kpt" element={<KptPage />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }
