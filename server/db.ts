@@ -325,6 +325,26 @@ db.exec(`
     result TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
+
+  -- FR#59: Wiki
+  CREATE TABLE IF NOT EXISTS wiki_pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_id INTEGER,
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (parent_id) REFERENCES wiki_pages(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS wiki_page_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    page_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    FOREIGN KEY (page_id) REFERENCES wiki_pages(id) ON DELETE CASCADE,
+    UNIQUE(page_id, date)
+  );
 `);
 
 export default db;

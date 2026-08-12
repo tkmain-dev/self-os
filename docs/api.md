@@ -29,6 +29,7 @@
 | 月度購入計画 | `/api/budget-mgmt/wish-plans` | `server/routes/budgetManagement.ts` |
 | AI分析 | `/api/budget-mgmt/analysis` | `server/routes/budgetManagement.ts` |
 | KPT | `/api/kpt` | `server/routes/kpt.ts` |
+| Wiki | `/api/wiki` | `server/routes/wiki.ts` |
 
 ---
 
@@ -867,6 +868,120 @@ Try エントリを Todo タスクに変換。
 
 ### GET `/api/kpt/prev-problems?year_week=YYYY-Wnn`
 指定週の前週の Problem エントリを取得（カテゴリ名付き）。
+
+---
+
+## Wiki API (`/api/wiki`)
+
+階層型 Wiki ページと日記リンク・画像アップロードを管理する。
+
+### GET `/api/wiki/pages`
+全ページをフラット配列で取得（`content` は含まない）。フロントエンドでツリーに変換する。
+
+**ソート**: `sort_order ASC, id ASC`
+
+**レスポンス**: `200`
+```json
+[{ "id": 1, "parent_id": null, "title": "ページ名", "sort_order": 0, "updated_at": "..." }]
+```
+
+### GET `/api/wiki/pages/:id`
+ページ詳細を取得（`content` + 関連日記リンクを含む）。
+
+**レスポンス**: `200`
+```json
+{
+  "id": 1,
+  "parent_id": null,
+  "title": "ページ名",
+  "content": "[...BlockNote JSON...]",
+  "sort_order": 0,
+  "created_at": "...",
+  "updated_at": "...",
+  "links": ["2026-08-12", "2026-08-01"]
+}
+```
+
+- `links`: 紐付いた日記日付の配列（降順）
+
+**エラー**: `404` — ページが存在しない
+
+### POST `/api/wiki/pages`
+ページを作成。
+
+**リクエスト**:
+```json
+{ "title": "ページ名", "parent_id": null, "content": "[...BlockNote JSON...]" }
+```
+
+または Markdown で本文を指定:
+
+```json
+{ "title": "ページ名", "parent_id": null, "markdown": "# 見出し\n\n本文..." }
+```
+
+- `title` は必須（空の場合 `400`）
+- `parent_id` はオプション（省略でルートページ）
+- `content` / `markdown` はどちらか一方を指定（両方省略で空ページ）
+- `sort_order` は同一親グループ内の最大値+1 が自動設定
+- **markdown**: `@blocknote/server-util` によりサーバー側で BlockNote JSON に自動変換される（Claude からの直接投稿用。変換失敗時は `500`）
+
+**レスポンス**: `201`（作成されたページ）
+
+### PATCH `/api/wiki/pages/:id`
+ページを部分更新。`title`, `content`, `markdown`, `parent_id`, `sort_order` を更新可能。
+
+- `markdown` 指定時はサーバー側で BlockNote JSON に変換して `content` を差し替え（`content` と両方指定した場合は `markdown` が優先）
+- 更新時は `updated_at` が自動更新される
+- `parent_id` / `sort_order` の変更でページツリー上の移動・並替を行う
+
+**レスポンス**: `200`（更新後のページ）/ `404`（ページなし）/ `400`（更新フィールドなし）
+
+### DELETE `/api/wiki/pages/:id`
+ページを削除。子ページ・関連リンクも CASCADE 削除。
+
+**レスポンス**: `200 { "ok": true }`
+
+### POST `/api/wiki/pages/:id/links`
+ページに日記の日付を紐付け。
+
+**リクエスト**: `{ "date": "2026-08-12" }`（YYYY-MM-DD 形式必須）
+**レスポンス**: `200 { "ok": true }` / `409`（既にリンク済み、UNIQUE(page_id, date) 制約）
+
+### DELETE `/api/wiki/pages/:id/links/:date`
+ページと日付のリンクを解除。
+
+**レスポンス**: `200 { "ok": true }`
+
+### GET `/api/wiki/links?date=YYYY-MM-DD`
+指定日に紐付いた Wiki ページの一覧を取得（デイリーページの関連 Wiki チップで使用）。
+
+**レスポンス**: `200`
+```json
+[{ "id": 3, "title": "ページ名" }]
+```
+
+### POST `/api/wiki/images`
+画像をアップロード。BlockNote エディタの `uploadFile`（コピペ画像貼付）から呼ばれる。
+
+**リクエスト**:
+```json
+{ "data": "<base64エンコード画像>", "mime": "image/png" }
+```
+
+- 対応 MIME: `image/png` / `image/jpeg` / `image/gif` / `image/webp`
+- 最大サイズ: **8MB**（超過時は `413`）
+- 保存先: `<dataDir>/uploads/YYYY/MM/<UUID>.<ext>`（本番は GCSFuse の `/data/uploads/`、ローカルは `data/uploads/`）
+
+**レスポンス**: `200`
+```json
+{ "url": "/api/wiki/images/2026/08/xxxxxxxx-....png" }
+```
+
+### GET `/api/wiki/images/:year/:month/:filename`
+アップロード済み画像を配信。ファイル名は UUID のため不変であり、`Cache-Control: public, max-age=31536000, immutable`（1年キャッシュ）付きで返す。
+
+**エラー**: `400`（不正なパス）/ `404`（ファイルなし）
 
 ---
 

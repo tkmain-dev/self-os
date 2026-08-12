@@ -42,4 +42,5 @@ Reactコンポーネントの階層、ルーティング、データフローを
 3. **目標管理** (`/goals`) — WBS ガントチャート（Epic > Story > Task > Subtask）
 4. **ウィッシュリスト** (`/wishlist`) — 買いたいもの / やりたいことの2タブ管理
 5. **KPT 振り返り** (`/kpt`) — 週次 Keep/Problem/Try をカテゴリ単位で管理
-6. **管理ページ**（歯車ボタン） — Feature Request 管理モーダル
+6. **Wiki** (`/wiki`) — 階層型ナレッジベース（ページツリー + BlockNote エディタ、日記との相互リンク）
+7. **管理ページ**（歯車ボタン） — Feature Request 管理モーダル

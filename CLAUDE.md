@@ -106,7 +106,37 @@ npm run lint         # ESLint
 
 ## DB テーブル一覧
 
-todos, diary, schedules, habits, habit_logs, goals, feature_requests, monthly_goals, wish_items, weekly_goals, routines, budget_entries, auth_sessions, budget_categories, budget_subcategories, budget_plans, budget_income, budget_actuals
+todos, diary, schedules, habits, habit_logs, goals, feature_requests, monthly_goals, wish_items, weekly_goals, routines, budget_entries, auth_sessions, budget_categories, budget_subcategories, budget_plans, budget_income, budget_actuals, wiki_pages, wiki_page_links
+
+## Claude から Wiki を操作する方法（FR#59）
+
+ユーザーが「この資料を Wiki に追加して」等と依頼したら、Wiki API で直接ページを作成する。
+**Markdown をそのまま送れる**（サーバー側で BlockNote JSON に自動変換される）。
+
+```bash
+# 1. ログイン（本番。ローカル開発中は http://localhost:3001 で認証不要）
+curl -s -c /tmp/cookies.txt -X POST https://techo-app-qci2z4yx2q-an.a.run.app/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"password":"<AUTH_PASSWORD>"}'
+
+# 2. ページツリー確認（id, parent_id, title の一覧）
+curl -s -b /tmp/cookies.txt https://techo-app-qci2z4yx2q-an.a.run.app/api/wiki/pages
+
+# 3. ページ作成（markdown フィールドで Markdown を直接渡せる。parent_id で階層指定）
+curl -s -b /tmp/cookies.txt -X POST https://techo-app-qci2z4yx2q-an.a.run.app/api/wiki/pages \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"ページ名","parent_id":null,"markdown":"# 見出し\n\n本文..."}'
+
+# 4. ページ更新（markdown で本文差し替え、title で改名）
+curl -s -b /tmp/cookies.txt -X PATCH https://techo-app-qci2z4yx2q-an.a.run.app/api/wiki/pages/:id \
+  -H 'Content-Type: application/json' -d '{"markdown":"# 更新後の本文"}'
+
+# 5. 日記との紐付け
+curl -s -b /tmp/cookies.txt -X POST https://techo-app-qci2z4yx2q-an.a.run.app/api/wiki/pages/:id/links \
+  -H 'Content-Type: application/json' -d '{"date":"YYYY-MM-DD"}'
+```
+
+- 長い Markdown はヒアドキュメントで JSON ファイルに書き出してから `-d @file.json` で送る
+- ページ削除は `DELETE /api/wiki/pages/:id`（子ページも CASCADE 削除される）
 
 ## 主要ファイル
 

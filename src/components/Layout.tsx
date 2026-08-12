@@ -15,6 +15,7 @@ const nav = [
   { to: '/wishlist', label: 'ウィッシュ', icon: '✦' },
   { to: '/budget', label: '家計簿', icon: '¥' },
   { to: '/kpt', label: 'KPT', icon: '↻' },
+  { to: '/wiki', label: 'Wiki', icon: '▤' },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {

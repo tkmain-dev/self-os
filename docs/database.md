@@ -227,6 +227,25 @@ erDiagram
         string result
         string created_at
     }
+
+    WIKI_PAGES {
+        int id PK
+        int parent_id FK
+        string title
+        string content
+        int sort_order
+        string created_at
+        string updated_at
+    }
+
+    WIKI_PAGE_LINKS {
+        int id PK
+        int page_id FK
+        string date
+    }
+
+    WIKI_PAGES ||--o{ WIKI_PAGES : "parent_id"
+    WIKI_PAGES ||--o{ WIKI_PAGE_LINKS : "has"
 ```
 
 ## テーブル定義
@@ -538,3 +557,30 @@ erDiagram
 - 月ごとに1レコード（UPSERT で管理）
 - `result` は Claude Sonnet API の分析結果を JSON 文字列で保存。スコアリング・カテゴリ別コメント・インサイト・節約提案を含む
 - 同一月を再分析した場合は上書き保存される
+
+### wiki_pages（Wikiページ）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | ページID |
+| parent_id | INTEGER | NULL, FK → wiki_pages(id) ON DELETE CASCADE | 親ページID（自己参照） |
+| title | TEXT | NOT NULL | ページタイトル |
+| content | TEXT | NOT NULL, DEFAULT '' | 本文（BlockNote JSON） |
+| sort_order | INTEGER | NOT NULL, DEFAULT 0 | 同一親内のソート順 |
+| created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
+| updated_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 更新日時 |
+
+- **階層構造**: `parent_id` による自己参照でページツリーを表現（深さ制限なし）
+- **カスケード削除**: 親ページ削除時に子ページ・関連リンクも自動削除
+- **content**: BlockNote リッチテキストエディタの JSON 形式。API 経由で Markdown を送ると `@blocknote/server-util` で自動変換して保存
+
+### wiki_page_links（Wikiページ⇔日記リンク）
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | INTEGER | PRIMARY KEY, AUTOINCREMENT | リンクID |
+| page_id | INTEGER | NOT NULL, FK → wiki_pages(id) ON DELETE CASCADE | WikiページID |
+| date | TEXT | NOT NULL | 紐付ける日記の日付（YYYY-MM-DD） |
+
+- UNIQUE(page_id, date): 同一ページ・同一日付の重複リンク不可
+- Wiki ページと日記（日付）の相互リンクに使用。Wiki 側は関連日記チップ、デイリーページ側は関連 Wiki チップとして表示

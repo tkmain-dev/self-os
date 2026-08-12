@@ -61,6 +61,18 @@ WBS（Work Breakdown Structure）ベースのガントチャートで目標を�
 - **CSV取込**: クレジットカード等のCSVから実績データを一括取込。ダブルクォート対応のパーサーで正確にパース。「未分類」カテゴリは自動スキップ。全削除ボタンで月次実績を一括削除
 - **予実比較**: 予算計画と実績の差分を表示。貯金額・余剰予算行を含む。PC（md以上）では2カラムレイアウト（左: 固定費+変動費比較、右: 収入+合計サマリー）。AI分析ボタンでClaude Sonnetによる家計分析を実行（スコアリング・グレード・カテゴリ別コメント・インサイト・節約提案）
 
+### Wiki (`/wiki`)
+階層型のナレッジベース。GitHub Docs 風のダークデザインで文書を管理する。
+
+- **ページツリー**: 左サイドバーに階層構造（親子ページ、折りたたみ可能）を表示。sky 色の縦バーで選択中ページを表示、sticky 追従
+- **文書レイアウト**: パンくずリスト、特大タイトル + 最終更新日、sky→violet グラデーションライン。カード枠なしのフラットな文書デザイン、h1/h2 に下ボーダー
+- **目次（TOC）**: 右サイドに「このページの内容」を表示。見出しを自動抽出し、クリックでスクロール
+- **BlockNote エディタ**: リッチテキスト編集。コピペ画像貼付対応（`uploadFile` 設定）、5秒デバウンス自動保存
+- **画像アップロード**: base64 で送信し `/data/uploads/YYYY/MM/UUID.ext` に保存（最大8MB）。1年 immutable キャッシュで配信
+- **関連日記**: ページに日付を紐付けるチップ表示。クリックで該当日のデイリーページ（`/daily?date=`）へ移動。デイリーページ側にも関連 Wiki チップを表示
+- **Markdown 対応 API**: `markdown` フィールドで Markdown を送ると `@blocknote/server-util` で BlockNote JSON に自動変換（Claude からの直接投稿に対応）
+- **スマホ対応**: モバイルではツリー⇔エディタの2画面切替
+
 ### 管理ページ（歯車ボタン）
 サイドバー左下の歯車ボタンからモーダルで開く。
 
@@ -122,7 +134,8 @@ techo-app/
 │       ├── featureRequests.ts
 │       ├── wishItems.ts
 │       ├── kpt.ts
-│       └── budgetManagement.ts
+│       ├── budgetManagement.ts
+│       └── wiki.ts
 ├── src/                      # フロントエンド
 │   ├── main.tsx              # React エントリポイント
 │   ├── App.tsx               # ルーティング定義
@@ -141,6 +154,7 @@ techo-app/
 │       ├── DatePicker.tsx     # 日付ピッカーコンポーネント
 │       ├── DiaryChecklist.tsx # 日記チェックリスト（グレーアウト）
 │       ├── KptPage.tsx       # KPT 振り返り
+│       ├── WikiPage.tsx       # Wiki（階層ページツリー + BlockNote エディタ）
 │       ├── admin/
 │       │   └── AdminModal.tsx # 管理モーダル (Feature Requests)
 │       └── calendar/          # カレンダー機能

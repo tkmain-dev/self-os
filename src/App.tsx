@@ -10,6 +10,7 @@ const GoalGantt = lazy(() => import('./components/GoalGantt'))
 const WishListPage = lazy(() => import('./components/WishListPage'))
 const BudgetPage = lazy(() => import('./components/BudgetPage'))
 const KptPage = lazy(() => import('./components/KptPage'))
+const WikiPage = lazy(() => import('./components/WikiPage'))
 
 function PageLoader() {
   return (
@@ -53,6 +54,7 @@ function App() {
           <Route path="/wishlist" element={<WishListPage />} />
           <Route path="/budget" element={<BudgetPage />} />
           <Route path="/kpt" element={<KptPage />} />
+          <Route path="/wiki" element={<WikiPage />} />
         </Routes>
       </Suspense>
     </Layout>

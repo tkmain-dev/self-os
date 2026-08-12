@@ -40,6 +40,7 @@
 - **TypeScript** — 型安全性（tsx で直接実行）
 - **better-sqlite3** — 同期的 SQLite ドライバ
 - **cors** — クロスオリジンリソース共有
+- **@blocknote/server-util** — Markdown → BlockNote JSON 変換（Wiki API の `markdown` フィールド。初回利用時に lazy ロード）
 
 ### データベース
 - **SQLite** — リレーショナルデータベース（ファイルベース）
@@ -68,7 +69,8 @@ techo-app/
 │       ├── goals.ts          # 目標 CRUD + 並替 + 期間伝播
 │       ├── featureRequests.ts # Feature Request CRUD + 並替
 │       ├── wishItems.ts      # ウィッシュアイテム CRUD + 並替
-│       └── kpt.ts            # KPT カテゴリ + エントリ CRUD + 自動引き継ぎ
+│       ├── kpt.ts            # KPT カテゴリ + エントリ CRUD + 自動引き継ぎ
+│       └── wiki.ts           # Wiki ページ CRUD + 日記リンク + 画像アップロード
 ├── src/                      # フロントエンド
 │   ├── main.tsx              # React エントリポイント
 │   ├── App.tsx               # ルーティング定義
@@ -85,6 +87,7 @@ techo-app/
 │       ├── TodoList.tsx       # ToDo リスト
 │       ├── WishListPage.tsx   # ウィッシュ / バケットリスト
 │       ├── KptPage.tsx       # KPT 振り返りページ
+│       ├── WikiPage.tsx       # Wiki（階層ページツリー + BlockNote エディタ）
 │       ├── admin/
 │       │   └── AdminModal.tsx # 管理モーダル (Feature Requests)
 │       └── calendar/          # カレンダー機能
@@ -118,6 +121,7 @@ techo-app/
 | `/goals` | `GoalGantt` | 目標管理ガントチャート |
 | `/wishlist` | `WishListPage` | ウィッシュ / バケットリスト |
 | `/kpt` | `KptPage` | KPT 振り返り |
+| `/wiki` | `WikiPage` | Wiki（階層ナレッジベース） |
 
 管理モーダル（`AdminModal`）はサイドバーの歯車ボタンから開き、Feature Request を管理する。
 
@@ -134,6 +138,7 @@ techo-app/
 │ 目標管理  │                              │
 │ ウィッシュ │                              │
 │ KPT      │                              │
+│ Wiki     │                              │
 │          │                              │
 │──────────│                              │
 │ ⚙ 管理   │                              │

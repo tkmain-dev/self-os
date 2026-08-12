@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { apiPost, apiPut, apiPatch, apiDelete } from '../hooks/useApi'
 import Diary from './Diary'
 import ReactMarkdown from 'react-markdown'
@@ -107,8 +108,42 @@ function MobileSection({ title, defaultOpen = false, action, children }: {
   )
 }
 
+// ── Related Wiki pages chip row ──
+function RelatedWikiChips({ date }: { date: string }) {
+  const navigate = useNavigate()
+  const [pages, setPages] = useState<{ id: number; title: string }[]>([])
+
+  useEffect(() => {
+    fetch(`/api/wiki/links?date=${date}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setPages(Array.isArray(d) ? d : []))
+      .catch(() => setPages([]))
+  }, [date])
+
+  if (pages.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap mb-3">
+      <span className="text-[10px] text-[#5a5a6e]">関連Wiki:</span>
+      {pages.map(p => (
+        <button
+          key={p.id}
+          onClick={() => navigate('/wiki')}
+          className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs hover:bg-sky-500/20 transition-colors"
+        >
+          {p.title || '無題'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function DailyPage() {
-  const [date, setDate] = useState(formatDate(new Date()))
+  const [searchParams] = useSearchParams()
+  const [date, setDate] = useState(() => {
+    const q = searchParams.get('date')
+    return q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : formatDate(new Date())
+  })
   const isToday = date === formatDate(new Date())
 
   const changeDate = (offset: number) => {
@@ -155,6 +190,7 @@ export default function DailyPage() {
           </div>
         </MobileSection>
         <MobileSection title="日記" defaultOpen>
+          <RelatedWikiChips date={date} />
           <Diary date={date} />
         </MobileSection>
         <MobileSection title="スケジュール">
@@ -173,7 +209,10 @@ export default function DailyPage() {
             <ScheduleTimeline date={date} isToday={isToday} />
           </div>
           <div className="flex-1 min-w-0 w-full space-y-6">
-            <Diary date={date} />
+            <div>
+              <RelatedWikiChips date={date} />
+              <Diary date={date} />
+            </div>
             <HabitSection date={date} />
           </div>
         </div>

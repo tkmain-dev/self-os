@@ -33,6 +33,7 @@ import weeklyGoalsRouter from './routes/weeklyGoals';
 import budgetRouter from './routes/budget';
 import budgetMgmtRouter from './routes/budgetManagement';
 import kptRouter from './routes/kpt';
+import wikiRouter from './routes/wiki';
 
 const app = express();
 const PORT = 3001;
@@ -107,6 +108,7 @@ app.use('/api/weekly-goals', weeklyGoalsRouter);
 app.use('/api/budget', budgetRouter);
 app.use('/api/budget-mgmt', budgetMgmtRouter);
 app.use('/api/kpt', kptRouter);
+app.use('/api/wiki', wikiRouter);
 
 // Serve static files in production
 const __filename = fileURLToPath(import.meta.url);
