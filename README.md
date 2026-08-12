@@ -71,6 +71,7 @@ WBS（Work Breakdown Structure）ベースのガントチャートで目標を�
 - **画像アップロード**: base64 で送信し `/data/uploads/YYYY/MM/UUID.ext` に保存（最大8MB）。1年 immutable キャッシュで配信
 - **関連日記**: ページに日付を紐付けるチップ表示。クリックで該当日のデイリーページ（`/daily?date=`）へ移動。デイリーページ側にも関連 Wiki チップを表示
 - **Markdown 対応 API**: `markdown` フィールドで Markdown を送ると `@blocknote/server-util` で BlockNote JSON に自動変換（Claude からの直接投稿に対応）
+- **Claude 連携（FR#61）**: Claude Code 用スキル（`skills/techo-wiki/` テンプレート）と、claude.ai（Cowork / モバイル / Web）用 MCP カスタムコネクタ（`/mcp/<MCP_SECRET>`、Wiki操作6ツール）を提供
 - **スマホ対応**: モバイルではツリー⇔エディタの2画面切替
 
 ### 管理ページ（歯車ボタン）
@@ -135,7 +136,8 @@ techo-app/
 │       ├── wishItems.ts
 │       ├── kpt.ts
 │       ├── budgetManagement.ts
-│       └── wiki.ts
+│       ├── wiki.ts
+│       └── mcp.ts             # claude.ai コネクタ用 MCP サーバー
 ├── src/                      # フロントエンド
 │   ├── main.tsx              # React エントリポイント
 │   ├── App.tsx               # ルーティング定義
@@ -171,6 +173,8 @@ techo-app/
 │           ├── holidays.ts
 │           ├── calendarTypes.ts
 │           └── calendarUtils.ts
+├── skills/
+│   └── techo-wiki/           # Claude 用 Wiki 操作スキル（テンプレート）
 └── data/                     # SQLite データベース (gitignore)
 ```
 

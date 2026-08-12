@@ -40,7 +40,8 @@
 - **TypeScript** — 型安全性（tsx で直接実行）
 - **better-sqlite3** — 同期的 SQLite ドライバ
 - **cors** — クロスオリジンリソース共有
-- **@blocknote/server-util** — Markdown → BlockNote JSON 変換（Wiki API の `markdown` フィールド。初回利用時に lazy ロード）
+- **@blocknote/server-util** — Markdown ⇔ BlockNote JSON 相互変換（Wiki API の `markdown` フィールド / MCP の本文読取。初回利用時に lazy ロード）
+- **@modelcontextprotocol/sdk** — claude.ai カスタムコネクタ用 MCP サーバー（Streamable HTTP、`/mcp/<MCP_SECRET>`）
 
 ### データベース
 - **SQLite** — リレーショナルデータベース（ファイルベース）
@@ -70,7 +71,8 @@ techo-app/
 │       ├── featureRequests.ts # Feature Request CRUD + 並替
 │       ├── wishItems.ts      # ウィッシュアイテム CRUD + 並替
 │       ├── kpt.ts            # KPT カテゴリ + エントリ CRUD + 自動引き継ぎ
-│       └── wiki.ts           # Wiki ページ CRUD + 日記リンク + 画像アップロード
+│       ├── wiki.ts           # Wiki ページ CRUD + 日記リンク + 画像アップロード
+│       └── mcp.ts            # claude.ai コネクタ用 MCP サーバー（Wiki 操作6ツール）
 ├── src/                      # フロントエンド
 │   ├── main.tsx              # React エントリポイント
 │   ├── App.tsx               # ルーティング定義
@@ -104,6 +106,8 @@ techo-app/
 │           ├── holidays.ts
 │           ├── calendarTypes.ts
 │           └── calendarUtils.ts
+├── skills/
+│   └── techo-wiki/           # Claude 用 Wiki 操作スキル（テンプレート、要パスワード置換）
 ├── data/                     # SQLite データベース (gitignore)
 ├── docs/                     # ドキュメント
 ├── package.json
