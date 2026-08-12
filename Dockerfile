@@ -1,6 +1,8 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
+# better-sqlite3 の prebuilt バイナリ取得に失敗した際のソースビルド用
+RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 RUN npm ci
 COPY . .
