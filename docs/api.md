@@ -985,6 +985,25 @@ Try エントリを Todo タスクに変換。
 
 ---
 
+## MCP サーバー (`/mcp/<MCP_SECRET>`)
+
+claude.ai（Cowork / モバイル / Web）のカスタムコネクタ用 MCP エンドポイント（FR#61）。
+`server/routes/mcp.ts`。MCP Streamable HTTP（stateless、POST のみ）。
+
+- **認証**: cookie 認証の対象外。環境変数 `MCP_SECRET`（推測不能な64文字）をパスに含めることで保護。`MCP_SECRET` 未設定時はエンドポイント自体が無効
+- **提供ツール**:
+
+| ツール | 説明 |
+|--------|------|
+| `wiki_list_pages` | ページツリー（id・タイトル・階層）を取得 |
+| `wiki_read_page` | ページ本文を Markdown に逆変換して取得（関連日記日付含む） |
+| `wiki_create_page` | ページ作成（Markdown 本文、parent_id で階層指定） |
+| `wiki_update_page` | 本文差し替え / 改名 / ツリー移動 |
+| `wiki_delete_page` | ページ削除（子ページ CASCADE） |
+| `wiki_link_diary` | 日記との相互リンク作成 |
+
+登録方法: claude.ai → 設定 → コネクタ → カスタムコネクタを追加 → `https://<APP_URL>/mcp/<MCP_SECRET>`（認証なし）
+
 ## エラーハンドリング
 
 一般的な HTTP ステータスコードを使用:

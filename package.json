@@ -19,6 +19,7 @@
     "@blocknote/server-util": "^0.46.2",
     "@mantine/core": "^8.3.15",
     "@mantine/hooks": "^8.3.15",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^12.6.2",
     "concurrently": "^9.2.1",
     "cookie-parser": "^1.4.7",

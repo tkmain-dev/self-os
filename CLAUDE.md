@@ -138,6 +138,11 @@ curl -s -b /tmp/cookies.txt -X POST https://techo-app-qci2z4yx2q-an.a.run.app/ap
 - 長い Markdown はヒアドキュメントで JSON ファイルに書き出してから `-d @file.json` で送る
 - ページ削除は `DELETE /api/wiki/pages/:id`（子ページも CASCADE 削除される）
 
+### Wiki 操作の他の入口（FR#61）
+
+- **Claude Code スキル**: `~/.claude/skills/techo-wiki/SKILL.md`（実パスワード入り、ローカルのみ）。テンプレートは `skills/techo-wiki/`
+- **claude.ai（Cowork/モバイル/Web）**: MCP カスタムコネクタ `/mcp/<MCP_SECRET>`（Streamable HTTP、`server/routes/mcp.ts`、6ツール）。シークレットは GitHub Secret `MCP_SECRET` と `.env.local` に保存（コミット禁止）
+
 ## 主要ファイル
 
 - `server/db.ts` — DB 初期化 + マイグレーション + 予算シードデータ

@@ -12,15 +12,34 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DB_PATH ? path.dirname(process.env.DB_PATH) : path.join(__dirname, '..', '..', 'data');
 const uploadsDir = path.join(dataDir, 'uploads');
 
-// Markdown → BlockNote JSON 変換 (lazy init — server-util は重いので初回利用時のみロード)
-let serverEditor: { tryParseMarkdownToBlocks: (md: string) => Promise<unknown[]> } | null = null;
-async function markdownToBlocks(markdown: string): Promise<string> {
+// Markdown ⇔ BlockNote JSON 変換 (lazy init — server-util は重いので初回利用時のみロード)
+interface ServerEditor {
+  tryParseMarkdownToBlocks: (md: string) => Promise<unknown[]>;
+  blocksToMarkdownLossy: (blocks: unknown[]) => Promise<string>;
+}
+let serverEditor: ServerEditor | null = null;
+async function getServerEditor(): Promise<ServerEditor> {
   if (!serverEditor) {
     const { ServerBlockNoteEditor } = await import('@blocknote/server-util');
-    serverEditor = ServerBlockNoteEditor.create();
+    serverEditor = ServerBlockNoteEditor.create() as unknown as ServerEditor;
   }
-  const blocks = await serverEditor.tryParseMarkdownToBlocks(markdown);
+  return serverEditor;
+}
+
+export async function markdownToBlocks(markdown: string): Promise<string> {
+  const editor = await getServerEditor();
+  const blocks = await editor.tryParseMarkdownToBlocks(markdown);
   return JSON.stringify(blocks);
+}
+
+export async function blocksToMarkdown(contentJson: string): Promise<string> {
+  if (!contentJson?.trim()) return '';
+  try {
+    const editor = await getServerEditor();
+    return await editor.blocksToMarkdownLossy(JSON.parse(contentJson));
+  } catch {
+    return '(本文の変換に失敗しました)';
+  }
 }
 
 // ── Pages ──

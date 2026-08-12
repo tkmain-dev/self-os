@@ -34,6 +34,7 @@ import budgetRouter from './routes/budget';
 import budgetMgmtRouter from './routes/budgetManagement';
 import kptRouter from './routes/kpt';
 import wikiRouter from './routes/wiki';
+import mcpRouter from './routes/mcp';
 
 const app = express();
 const PORT = 3001;
@@ -109,6 +110,13 @@ app.use('/api/budget', budgetRouter);
 app.use('/api/budget-mgmt', budgetMgmtRouter);
 app.use('/api/kpt', kptRouter);
 app.use('/api/wiki', wikiRouter);
+
+// FR#61: MCP server for claude.ai custom connector (Cowork / mobile / web).
+// Protected by an unguessable secret path instead of cookie auth
+// (claude.ai infra calls this endpoint directly; MCP_SECRET unset = disabled).
+if (process.env.MCP_SECRET) {
+  app.use(`/mcp/${process.env.MCP_SECRET}`, mcpRouter);
+}
 
 // Serve static files in production
 const __filename = fileURLToPath(import.meta.url);
