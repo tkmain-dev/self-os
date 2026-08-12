@@ -412,7 +412,7 @@ export default function WikiPage() {
   const handleDeleted = useCallback(() => setSelectedId(null), [])
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full max-w-[1800px] mx-auto">
       <div className="mb-4 pb-4 border-b border-[#2a2a3a] bg-gradient-to-r from-sky-500/8 to-transparent -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1">
         <h1 className="text-2xl font-bold text-white tracking-wide mb-1">Wiki</h1>
         <p className="text-sm text-[#5a5a6e]">知識・記録を整理する</p>
