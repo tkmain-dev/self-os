@@ -22,6 +22,8 @@ interface Habit {
   sort_order: number
   duration: number
   day_of_week: string
+  memo: string | null
+  url: string | null
 }
 
 interface HabitNode extends Habit {
@@ -812,18 +814,24 @@ const DURATION_PRESETS = [15, 30, 45, 60, 90, 120]
 // ══════════════════════════════════════
 function HabitEditPanel({ habit, onSave }: {
   habit: Habit
-  onSave: (name: string, duration: number, day_of_week: string) => void
+  onSave: (name: string, duration: number, day_of_week: string, memo: string, url: string) => void
 }) {
   const [name, setName] = useState(habit.name)
   const [duration, setDuration] = useState(habit.duration ?? 30)
+  const [memo, setMemo] = useState(habit.memo ?? '')
+  const [url, setUrl] = useState(habit.url ?? '')
   const [selected, setSelected] = useState<Set<string>>(
     new Set((habit.day_of_week || '').split(',').filter(Boolean))
   )
   useEffect(() => {
     setName(habit.name)
     setDuration(habit.duration ?? 30)
+    setMemo(habit.memo ?? '')
+    setUrl(habit.url ?? '')
     setSelected(new Set((habit.day_of_week || '').split(',').filter(Boolean)))
   }, [habit.id])
+
+  const save = () => onSave(name.trim() || habit.name, duration, Array.from(selected).sort().join(','), memo.trim(), url.trim())
 
   const toggleDay = (d: string) => setSelected(prev => {
     const n = new Set(prev); n.has(d) ? n.delete(d) : n.add(d); return n
@@ -836,8 +844,26 @@ function HabitEditPanel({ habit, onSave }: {
       <div>
         <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">名前</label>
         <input value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onSave(name.trim() || habit.name, duration, Array.from(selected).sort().join(','))}
+          onKeyDown={e => e.key === 'Enter' && save()}
           className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-[#e4e4ec] outline-none focus:border-amber-500/40 transition-colors" />
+      </div>
+
+      {/* Memo */}
+      <div>
+        <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">概要・メモ</label>
+        <textarea value={memo} onChange={e => setMemo(e.target.value)}
+          rows={3}
+          placeholder="メニュー内容や注意点など（デイリーページの ⓘ から確認できます）"
+          className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-xs text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none focus:border-amber-500/40 transition-colors resize-none" />
+      </div>
+
+      {/* URL */}
+      <div>
+        <label className="text-[10px] text-[#5a5a6e] uppercase tracking-widest font-mono block mb-2">参考URL</label>
+        <input value={url} onChange={e => setUrl(e.target.value)}
+          type="text" inputMode="url"
+          placeholder="https://youtube.com/...（デイリーページから1クリックで開けます）"
+          className="w-full bg-[#0e0e12] border border-[#2a2a3a] rounded-lg px-3 py-2 text-xs text-[#e4e4ec] placeholder:text-[#3a3a4e] outline-none focus:border-amber-500/40 transition-colors" />
       </div>
 
       {/* Duration */}
@@ -907,7 +933,7 @@ function HabitEditPanel({ habit, onSave }: {
       </div>
 
       <button
-        onClick={() => onSave(name.trim() || habit.name, duration, Array.from(selected).sort().join(','))}
+        onClick={save}
         className="bg-amber-500 text-black font-bold text-sm px-5 py-2 rounded-lg hover:bg-amber-400 transition-colors">
         保存
       </button>
@@ -1068,8 +1094,8 @@ function HabitManagerModal({ onClose }: { onClose: () => void }) {
             ) : isLeaf ? (
               <HabitEditPanel
                 habit={selectedHabit}
-                onSave={async (name, dur, dow) => {
-                  await apiPatch(`/api/habits/${selectedHabit.id}`, { name, duration: dur, day_of_week: dow })
+                onSave={async (name, dur, dow, memo, url) => {
+                  await apiPatch(`/api/habits/${selectedHabit.id}`, { name, duration: dur, day_of_week: dow, memo, url })
                   fetchHabits()
                 }}
               />
@@ -1163,50 +1189,71 @@ function HabitSection({ date }: { date: string }) {
     }
   }
 
+  const openHabitUrl = (url: string) => {
+    const href = /^https?:\/\//.test(url) ? url : `https://${url}`
+    window.open(href, '_blank', 'noopener')
+  }
+
   const HabitItem = ({ habit, inGroup }: { habit: Habit; inGroup?: boolean }) => {
     const checked = isChecked(habit.id)
     return (
       <div
-        className={`flex items-center gap-2.5 px-3 py-2.5 transition-all ${
+        className={`transition-all ${
           inGroup
             ? `rounded-lg ${checked ? 'bg-amber-500/5' : 'hover:bg-[#1f1f2e]'}`
             : `rounded-xl border ${checked ? 'bg-amber-500/5 border-amber-500/15' : 'bg-[#16161e] border-[#2a2a3a] hover:border-[#3a3a4e]'}`
         }`}>
-        {/* Drag handle */}
-        <span
-          draggable
-          onDragStart={e => {
-            e.dataTransfer.setData('habit-id', String(habit.id))
-            e.dataTransfer.setData('habit-name', habit.name)
-            e.dataTransfer.setData('habit-duration', String(habit.duration || 30))
-          }}
-          className="cursor-grab text-[#2a2a3a] hover:text-amber-400 transition-colors text-sm select-none shrink-0"
-          title="タイムラインにドラッグして予定を設定">
-          ⠿
-        </span>
-        {/* Name */}
-        <div className="flex-1 min-w-0">
-          <div className={`text-xs font-medium truncate ${checked ? 'text-[#3a3a4e] line-through' : 'text-[#e4e4ec]'}`}>
-            {habit.name}
-          </div>
-        </div>
-        {/* Duration badge */}
-        {habit.duration > 0 && (
-          <span className={`text-[9px] shrink-0 font-mono px-1.5 py-0.5 rounded ${
-            checked ? 'text-[#2a2a3a]' : 'text-[#3a3a4e] bg-[#1e1e2a]'
-          }`}>
-            {habit.duration}分
+        <div className="flex items-center gap-2.5 px-3 py-2.5">
+          {/* Drag handle */}
+          <span
+            draggable
+            onDragStart={e => {
+              e.dataTransfer.setData('habit-id', String(habit.id))
+              e.dataTransfer.setData('habit-name', habit.name)
+              e.dataTransfer.setData('habit-duration', String(habit.duration || 30))
+            }}
+            className="cursor-grab text-[#2a2a3a] hover:text-amber-400 transition-colors text-sm select-none shrink-0"
+            title="タイムラインにドラッグして予定を設定">
+            ⠿
           </span>
-        )}
-        {/* Done toggle */}
-        <button onClick={() => handleToggle(habit.id)}
-          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs shrink-0 transition-all ${
-            checked
-              ? 'bg-amber-500 border-amber-500 text-black shadow-md shadow-amber-500/25'
-              : 'border-[#3a3a4e] hover:border-amber-500 text-transparent hover:scale-110'
-          }`}>
-          ✓
-        </button>
+          {/* Name + memo (memo is always-visible supplementary text) */}
+          <div className="flex-1 min-w-0">
+            <div className={`text-xs font-medium truncate ${checked ? 'text-[#3a3a4e] line-through' : 'text-[#e4e4ec]'}`}>
+              {habit.name}
+            </div>
+            {habit.memo && (
+              <div className={`text-[10px] leading-snug whitespace-pre-wrap mt-0.5 ${checked ? 'text-[#2a2a3a]' : 'text-[#5a5a6e]'}`}>
+                {habit.memo}
+              </div>
+            )}
+          </div>
+          {/* Reference URL */}
+          {habit.url && (
+            <button
+              onClick={() => openHabitUrl(habit.url!)}
+              className="w-5 h-5 rounded-full text-[10px] flex items-center justify-center shrink-0 text-[#4a4a5e] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title={habit.url}>
+              ▶
+            </button>
+          )}
+          {/* Duration badge */}
+          {habit.duration > 0 && (
+            <span className={`text-[9px] shrink-0 font-mono px-1.5 py-0.5 rounded ${
+              checked ? 'text-[#2a2a3a]' : 'text-[#3a3a4e] bg-[#1e1e2a]'
+            }`}>
+              {habit.duration}分
+            </span>
+          )}
+          {/* Done toggle */}
+          <button onClick={() => handleToggle(habit.id)}
+            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs shrink-0 transition-all ${
+              checked
+                ? 'bg-amber-500 border-amber-500 text-black shadow-md shadow-amber-500/25'
+                : 'border-[#3a3a4e] hover:border-amber-500 text-transparent hover:scale-110'
+            }`}>
+            ✓
+          </button>
+        </div>
       </div>
     )
   }

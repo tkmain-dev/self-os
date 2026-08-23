@@ -148,9 +148,9 @@
 **レスポンス**: `201`
 
 ### PATCH `/api/habits/:id`
-習慣の設定を更新。`name`, `duration`, `day_of_week` を部分更新可能。
+習慣の設定を更新。`name`, `duration`, `day_of_week`, `memo`, `url` を部分更新可能。
 
-**リクエスト**: `{ "name": "新しい習慣名", "duration": 45, "day_of_week": "1,2,3,4,5" }`
+**リクエスト**: `{ "name": "新しい習慣名", "duration": 45, "day_of_week": "1,2,3,4,5", "memo": "メニュー内容", "url": "https://youtube.com/..." }`
 **レスポンス**: `200`
 
 ### DELETE `/api/habits/:id`

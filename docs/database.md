@@ -295,6 +295,8 @@ erDiagram
 | sort_order | INTEGER | NOT NULL, DEFAULT 0 | ソート順 |
 | duration | INTEGER | NOT NULL, DEFAULT 30 | 所要時間（分） |
 | day_of_week | TEXT | NOT NULL, DEFAULT '' | 実行曜日（カンマ区切り数字列、0=日〜6=土） |
+| memo | TEXT | NULL | 概要・メモ（デイリーページで習慣名の下に常時表示） |
+| url | TEXT | NULL | 参考URL（デイリーページの ▶ ボタンで新規タブで開く） |
 | created_at | TEXT | NOT NULL, DEFAULT (datetime('now', 'localtime')) | 作成日時 |
 
 - **階層構造**: `parent_id` による親子関係。親習慣（グループ）と子習慣の2階層

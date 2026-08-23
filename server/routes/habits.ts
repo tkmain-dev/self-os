@@ -24,11 +24,13 @@ router.post('/', (req, res) => {
 router.patch('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id) as Record<string, unknown>;
   if (!existing) { res.status(404).json({ error: 'Not found' }); return; }
-  const { name, duration, day_of_week } = req.body;
-  db.prepare('UPDATE habits SET name=?, duration=?, day_of_week=? WHERE id=?').run(
+  const { name, duration, day_of_week, memo, url } = req.body;
+  db.prepare('UPDATE habits SET name=?, duration=?, day_of_week=?, memo=?, url=? WHERE id=?').run(
     name ?? existing.name,
     duration !== undefined ? duration : existing.duration,
     day_of_week !== undefined ? day_of_week : existing.day_of_week,
+    memo !== undefined ? memo : existing.memo,
+    url !== undefined ? url : existing.url,
     req.params.id
   );
   const updated = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
