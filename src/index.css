@@ -507,3 +507,17 @@ body {
 .bn-block-content[data-content-type="codeBlock"] code {
   font-size: 0.72rem !important;
 }
+
+/* ── Checklist rows: BlockNote defaults to a fixed 24px checkbox row, far taller
+     than our 0.85rem text — align the checkbox column with the text height ── */
+.bn-block-content[data-content-type="checkListItem"] > div:has(> input) {
+  height: auto !important;
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+.bn-block-content[data-content-type="checkListItem"] input[type="checkbox"] {
+  height: 13px !important;
+  width: 13px !important;
+  margin-block: 0 !important;
+}
